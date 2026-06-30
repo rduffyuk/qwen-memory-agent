@@ -5,9 +5,10 @@ from typing import Any
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from memory_agent.agent import MemoryAgent
 from memory_agent.engine import MemoryEngine
 from memory_agent.mcp_server import create_mcp_server
-from memory_agent.qwen import QwenClient
+from memory_agent.qwen import ChatTurn, QwenClient
 from memory_agent.store import MemoryStore
 
 
@@ -15,8 +16,13 @@ class LazyQwenClient:
     def __init__(self) -> None:
         self._client: QwenClient | None = None
 
-    def chat(self, messages: list[dict[str, str]], model: str | None = None) -> str:
-        return self._get_client().chat(messages, model=model)
+    def chat(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
+        model: str | None = None,
+    ) -> str | ChatTurn:
+        return self._get_client().chat(messages, tools=tools, model=model)
 
     def embed(self, text: str) -> list[float]:
         return self._get_client().embed(text)
@@ -35,6 +41,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     answer: str
+    tool_calls_made: list[str]
     memories: list[dict[str, Any]]
 
 
@@ -50,20 +57,11 @@ def create_app(engine: MemoryEngine | None = None) -> FastAPI:
 
     @app.post("/chat", response_model=ChatResponse)
     def chat(request: ChatRequest) -> ChatResponse:
-        memories = resolved_engine.retrieve(request.message, token_budget=request.token_budget)
-        context = "\n".join(record.text for record in memories)
-        answer = resolved_engine.qwen.chat(
-            [
-                {
-                    "role": "system",
-                    "content": "Use the supplied memories when they are relevant.",
-                },
-                {"role": "user", "content": f"Memories:\n{context}\n\nUser:\n{request.message}"},
-            ]
-        )
+        result = MemoryAgent(resolved_engine).run(request.message, session_id=request.session_id)
         return ChatResponse(
-            answer=answer,
-            memories=[record.model_dump(mode="json") for record in memories],
+            answer=result.answer,
+            tool_calls_made=result.tool_calls_made,
+            memories=result.memories,
         )
 
     return app
