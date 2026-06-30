@@ -8,6 +8,10 @@ from memory_agent.models import MemoryRecord
 from memory_agent.qwen import QwenClient
 from memory_agent.store import MemoryStore, SearchResult
 
+DECAY_HALF_LIVES = {"fact": 30.0, "episodic": 7.0}
+DEFAULT_HALF_LIFE_DAYS = 30.0
+PINNED_TYPES = {"preference"}
+
 
 class MemoryEngine:
     def __init__(
@@ -72,7 +76,7 @@ class MemoryEngine:
                 continue
             packed.append(result.record)
             used += separator_cost + cost
-        return packed
+        return self._reinforce(packed)
 
     def forget(
         self,
@@ -80,6 +84,7 @@ class MemoryEngine:
         record_id: str | None = None,
         ttl_seconds: int | None = None,
         salience_below: float | None = None,
+        decayed_below: float | None = None,
         subject: str | None = None,
     ) -> int:
         if record_id is not None:
@@ -91,8 +96,9 @@ class MemoryEngine:
             if subject is not None and record.subject != subject:
                 continue
             expired = ttl_seconds is not None and (now - record.ts).total_seconds() > ttl_seconds
-            decayed = salience_below is not None and record.salience < salience_below
-            if expired or decayed:
+            low_salience = salience_below is not None and record.salience < salience_below
+            decayed = decayed_below is not None and effective_salience(record) < decayed_below
+            if expired or low_salience or decayed:
                 to_delete.append(record.id)
 
         for delete_id in to_delete:
@@ -108,8 +114,31 @@ class MemoryEngine:
         return (
             self.alpha * result.cosine
             + self.beta * _recency_score(result.record)
-            + self.gamma * result.record.salience
+            + self.gamma * effective_salience(result.record)
         )
+
+    def _reinforce(self, records: list[MemoryRecord]) -> list[MemoryRecord]:
+        now = datetime.now(timezone.utc)
+        reinforced: list[MemoryRecord] = []
+        for record in records:
+            updated = record.model_copy(
+                update={"access_count": record.access_count + 1, "last_accessed": now}
+            )
+            self.store.upsert(updated, self.store._vectors[record.id])
+            reinforced.append(updated)
+        return reinforced
+
+
+def effective_salience(record: MemoryRecord) -> float:
+    if record.type in PINNED_TYPES:
+        return record.salience
+
+    age_days = max(
+        (datetime.now(timezone.utc) - record.last_accessed).total_seconds() / 86_400, 0.0
+    )
+    half_life_days = DECAY_HALF_LIVES.get(record.type, DEFAULT_HALF_LIFE_DAYS)
+    factor = 0.5 ** (age_days / half_life_days)
+    return record.salience * factor
 
 
 def _recency_score(record: MemoryRecord) -> float:
