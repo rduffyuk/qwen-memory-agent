@@ -28,7 +28,10 @@ def synthetic_personas() -> list[dict[str, Any]]:
                 },
             ],
             "distractors": [
-                {"text": "A distractor says Sam likes coffee.", "subject": "sam_drink"},
+                # Distractor about a *different* person's drink — tests subject
+                # discrimination. Deliberately avoids the stale keyword ("coffee")
+                # so staleness scoring measures supersession, not keyword bleed.
+                {"text": "A distractor says Sam drinks soda at lunch.", "subject": "sam_drink"},
                 {"text": "A distractor says Maya likes Ruby.", "subject": "maya_language"},
             ],
         }

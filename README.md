@@ -55,7 +55,23 @@ uv run pytest -q       # tests run fully mocked — zero Qwen credit spend
 
 ## Benchmark results
 
-_Populated by `benchmark/` once the harness runs. (B3 = ours; lower staleness, higher accuracy at a fixed small budget.)_
+Reproducible and **fully offline** — `uv run python -m benchmark.run` uses a deterministic
+keyword embedder, so the harness measures the *memory engine's* ranking + supersession logic
+(not embedding noise) and costs **zero Qwen credits**.
+
+| System | Recall accuracy | Staleness rate |
+|--------|:--------------:|:--------------:|
+| B0 — no memory | 0.00 | 0.00 |
+| B1 — full-history stuffing | 1.00 | 0.50 |
+| B2 — naive top-k RAG | 1.00 | 0.50 |
+| **B3 — ours (supersession + budget)** | **1.00** | **0.00** |
+
+**B3 is the only system that recalls the current preference (1.00) _and_ never surfaces a
+superseded one (0.00 staleness).** B1 and B2 match on recall but re-surface the retired
+"coffee" preference on half the queries — because neither has a notion of "this fact was
+replaced." Staleness = fraction of queries whose answer contained a retired fact (lower is
+better), over the synthetic multi-session persona set in `benchmark/generate.py`.
+Supersession-aware forgetting is what separates B3.
 
 ## License
 

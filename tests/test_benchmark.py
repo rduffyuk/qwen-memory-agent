@@ -63,10 +63,15 @@ def test_run_end_to_end(tmp_path) -> None:
     assert results["baselines"]["B1"]["recall_accuracy"] == 1.0
     assert "B2" in results["baselines"]
     assert set(results["baselines"]["B3"]) == {"512", "1000", "2000"}
-    assert (
-        results["baselines"]["B3"]["2000"]["staleness_rate"]
-        <= results["baselines"]["B2"]["staleness_rate"]
-    )
+    # B3's whole thesis: supersession retires stale facts the naive baselines keep.
+    # At every budget B3 must be *strictly* less stale than naive top-k (B2),
+    # while still recalling the current answer.
+    for budget in ("512", "1000", "2000"):
+        assert (
+            results["baselines"]["B3"][budget]["staleness_rate"]
+            < results["baselines"]["B2"]["staleness_rate"]
+        )
+        assert results["baselines"]["B3"][budget]["recall_accuracy"] == 1.0
 
 
 def test_score_empty_fixtures_returns_zeros() -> None:

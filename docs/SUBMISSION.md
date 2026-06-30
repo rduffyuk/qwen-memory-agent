@@ -61,7 +61,17 @@ lower is better), and a **context-efficiency curve** (accuracy at 512/1k/2k-toke
 budgets). Win condition: **B3 matches or beats B1/B2 on accuracy at a fixed small
 budget, with the lowest staleness.**
 
-> _Live results from the graded run go here (table + `context_efficiency.png`)._
+**Graded run** (`uv run python -m benchmark.run`, deterministic + offline, zero spend):
+
+| System | Recall | Staleness |
+|--------|:------:|:---------:|
+| B0 no-memory | 0.00 | 0.00 |
+| B1 full-history | 1.00 | 0.50 |
+| B2 naive top-k | 1.00 | 0.50 |
+| **B3 ours** | **1.00** | **0.00** |
+
+B3 is the only system that recalls the current preference *and* never re-surfaces a
+superseded one — the supersession win, measured rather than asserted.
 
 ### Built with
 Python · FastAPI · FastMCP · Qdrant · `openai` SDK → Qwen Cloud / DashScope
