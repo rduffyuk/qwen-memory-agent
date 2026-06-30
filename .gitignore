@@ -5,3 +5,6 @@ __pycache__/
 .venv/
 .qdrant/
 !.env.example
+
+# generated benchmark output (commit real results explicitly with: git add -f)
+benchmark/results/*.json

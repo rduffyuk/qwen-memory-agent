@@ -38,6 +38,7 @@ packages = ["src/memory_agent"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+pythonpath = [".", "src"]
 
 [tool.isort]
 profile = "black"
