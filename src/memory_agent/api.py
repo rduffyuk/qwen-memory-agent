@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import asdict
 from typing import Any
 
@@ -104,7 +105,11 @@ class DreamApplyRequest(BaseModel):
 
 def create_app(engine: MemoryEngine | None = None) -> FastAPI:
     app = FastAPI(title="qwen-memory-agent")
-    resolved_engine = engine or MemoryEngine(qwen=LazyQwenClient(), store=MemoryStore())
+    resolved_engine = engine or MemoryEngine(
+        qwen=LazyQwenClient(),
+        store=MemoryStore(),
+        supersede_threshold=float(os.getenv("SUPERSEDE_THRESHOLD", "0.9")),
+    )
     app.state.engine = resolved_engine
     app.state.mcp = create_mcp_server(resolved_engine)
 

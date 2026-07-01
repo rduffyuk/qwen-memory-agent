@@ -68,3 +68,12 @@ def test_chat_returns_answer_and_relevant_memories() -> None:
     assert body["answer"] == "fake-answer"
     assert body["tool_calls_made"] == ["recall"]
     assert any("tea" in memory["text"].lower() for memory in body["memories"])
+
+
+def test_create_app_default_supersede_threshold_is_0_9(monkeypatch) -> None:
+    # Pin the API's env default: with SUPERSEDE_THRESHOLD unset, the default engine
+    # must use 0.9 (a mutation of the "0.9" fallback literal to "1.9" would disable
+    # semantic supersession on the live box and otherwise go untested).
+    monkeypatch.delenv("SUPERSEDE_THRESHOLD", raising=False)
+    app = create_app()
+    assert app.state.engine.supersede_threshold == 0.9

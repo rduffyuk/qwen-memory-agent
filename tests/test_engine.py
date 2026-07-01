@@ -18,6 +18,17 @@ class FakeQwen:
         return messages[-1]["content"]
 
 
+class VectorQwen:
+    def __init__(self, vectors: dict[str, list[float]]) -> None:
+        self.vectors = vectors
+
+    def embed(self, text: str) -> list[float]:
+        return self.vectors[text]
+
+    def chat(self, messages: list[dict[str, str]], model: str | None = None) -> str:
+        return messages[-1]["content"]
+
+
 def make_engine(token_budget: int = 128) -> MemoryEngine:
     return MemoryEngine(
         qwen=FakeQwen(),
@@ -111,3 +122,124 @@ def test_history_returns_superseded_records_newest_retired_first() -> None:
     assert [record.id for record in retired] == [second.id, first.id]
     assert active.id not in {record.id for record in retired}
     assert all(record.superseded_by is not None for record in retired)
+
+
+def test_semantic_supersession_retires_different_subject_paraphrase() -> None:
+    engine = MemoryEngine(
+        qwen=VectorQwen(
+            {
+                "Ryan prefers coffee in the morning.": [1.0, 0.0],
+                "Ryan's morning beverage is coffee.": [0.95, 0.05],
+            }
+        ),
+        store=MemoryStore(location=":memory:"),
+        supersede_threshold=0.9,
+    )
+
+    old = engine.write("Ryan prefers coffee in the morning.", type="fact", subject="s1")
+    new = engine.write("Ryan's morning beverage is coffee.", type="fact", subject="s2")
+
+    stored_old = engine.store.get(old.id)
+    assert stored_old is not None
+    assert stored_old.superseded_by == new.id
+
+
+def test_semantic_supersession_preserves_distinct_low_similarity_fact() -> None:
+    engine = MemoryEngine(
+        qwen=VectorQwen(
+            {
+                "Ryan prefers coffee in the morning.": [1.0, 0.0],
+                "Ryan likes jazz while coding.": [0.0, 1.0],
+                "coffee query": [1.0, 0.0],
+            }
+        ),
+        store=MemoryStore(location=":memory:"),
+        supersede_threshold=0.9,
+    )
+
+    old = engine.write("Ryan prefers coffee in the morning.", type="fact", subject="s1")
+    new = engine.write("Ryan likes jazz while coding.", type="fact", subject="s2")
+
+    stored_old = engine.store.get(old.id)
+    assert stored_old is not None
+    assert stored_old.superseded_by is None
+    recalled_ids = {record.id for record in engine.retrieve("coffee query", token_budget=128)}
+    assert {old.id, new.id}.issubset(recalled_ids)
+
+
+def test_semantic_supersession_only_matches_same_type() -> None:
+    engine = MemoryEngine(
+        qwen=VectorQwen(
+            {
+                "Ryan prefers coffee in the morning.": [1.0, 0.0],
+                "Ryan's morning beverage is coffee.": [1.0, 0.0],
+            }
+        ),
+        store=MemoryStore(location=":memory:"),
+        supersede_threshold=0.9,
+    )
+
+    old = engine.write("Ryan prefers coffee in the morning.", type="fact", subject="s1")
+    engine.write("Ryan's morning beverage is coffee.", type="preference", subject="s2")
+
+    stored_old = engine.store.get(old.id)
+    assert stored_old is not None
+    assert stored_old.superseded_by is None
+
+
+def test_semantic_supersession_threshold_is_honored() -> None:
+    vectors = {
+        "Ryan prefers coffee in the morning.": [1.0, 0.0],
+        "Ryan's morning beverage is coffee.": [0.8, 0.6],
+    }
+    low_threshold_engine = MemoryEngine(
+        qwen=VectorQwen(vectors),
+        store=MemoryStore(location=":memory:"),
+        supersede_threshold=0.75,
+    )
+    high_threshold_engine = MemoryEngine(
+        qwen=VectorQwen(vectors),
+        store=MemoryStore(location=":memory:"),
+        supersede_threshold=0.85,
+    )
+
+    low_old = low_threshold_engine.write(
+        "Ryan prefers coffee in the morning.", type="fact", subject="s1"
+    )
+    low_new = low_threshold_engine.write(
+        "Ryan's morning beverage is coffee.", type="fact", subject="s2"
+    )
+    high_old = high_threshold_engine.write(
+        "Ryan prefers coffee in the morning.", type="fact", subject="s1"
+    )
+    high_threshold_engine.write("Ryan's morning beverage is coffee.", type="fact", subject="s2")
+
+    low_stored_old = low_threshold_engine.store.get(low_old.id)
+    high_stored_old = high_threshold_engine.store.get(high_old.id)
+    assert low_stored_old is not None
+    assert high_stored_old is not None
+    assert low_stored_old.superseded_by == low_new.id
+    assert high_stored_old.superseded_by is None
+
+
+def test_default_supersede_threshold_is_0_9_and_enables_retirement() -> None:
+    # Codex's semantic-supersession tests all pass an EXPLICIT threshold, so the
+    # DEFAULT (0.9) was never exercised — a mutation to 1.9 (unreachable, cosine <= 1)
+    # silently disabled the feature and survived. Pin the literal AND the behaviour.
+    engine = MemoryEngine(
+        qwen=VectorQwen(
+            {
+                "Ryan prefers coffee in the morning.": [1.0, 0.0],
+                "Ryan's morning beverage is coffee.": [0.95, 0.05],  # cosine ~0.999 vs first
+            }
+        ),
+        store=MemoryStore(location=":memory:"),
+    )  # no supersede_threshold -> default
+
+    assert engine.supersede_threshold == 0.9
+    old = engine.write("Ryan prefers coffee in the morning.", type="fact", subject="s1")
+    new = engine.write("Ryan's morning beverage is coffee.", type="fact", subject="s2")
+
+    stored_old = engine.store.get(old.id)
+    assert stored_old is not None
+    assert stored_old.superseded_by == new.id

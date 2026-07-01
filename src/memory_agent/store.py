@@ -103,6 +103,25 @@ class MemoryStore:
             if record.subject == subject and record.type == type and not record.superseded_by
         ]
 
+    def most_similar_active(
+        self,
+        vector: list[float],
+        *,
+        type: str,
+        exclude_id: str,
+        min_cosine: float,
+    ) -> MemoryRecord | None:
+        best_record: MemoryRecord | None = None
+        best_cosine = min_cosine
+        for record_id, record in self._records.items():
+            if record_id == exclude_id or record.type != type or record.superseded_by is not None:
+                continue
+            cosine = _cosine(vector, self._vectors[record_id])
+            if cosine >= best_cosine:
+                best_record = record
+                best_cosine = cosine
+        return best_record
+
     def stats(self) -> dict[str, int]:
         active = len(self.list_records())
         return {

@@ -33,6 +33,7 @@ class MemoryEngine:
         beta: float = 0.15,
         gamma: float = 0.15,
         delta: float = 0.10,
+        supersede_threshold: float = 0.9,
     ) -> None:
         self.qwen = qwen
         self.store = store or MemoryStore(location=":memory:")
@@ -41,6 +42,7 @@ class MemoryEngine:
         self.beta = beta
         self.gamma = gamma
         self.delta = delta
+        self.supersede_threshold = supersede_threshold
         self._encoding = _load_encoding()
 
     def write(
@@ -59,12 +61,21 @@ class MemoryEngine:
             salience=salience,
             session_id=session_id,
         )
+        vector = self.qwen.embed(record.text)
         for prior in self.store.active_by_subject_type(record.subject, record.type):
             if prior.text.strip().casefold() != record.text.strip().casefold():
                 self.store.mark_superseded(prior.id, record.id)
 
-        vector = self.qwen.embed(record.text)
-        return self.store.upsert(record, vector)
+        stored = self.store.upsert(record, vector)
+        match = self.store.most_similar_active(
+            vector,
+            type=record.type,
+            exclude_id=record.id,
+            min_cosine=self.supersede_threshold,
+        )
+        if match is not None and match.superseded_by is None and match.id != record.id:
+            self.store.mark_superseded(match.id, record.id)
+        return stored
 
     def retrieve(
         self,
