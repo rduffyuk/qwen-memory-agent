@@ -6,6 +6,16 @@ from typing import Any
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
+# Load DASHSCOPE_* from a local .env when running the server (e.g. `uv run uvicorn`)
+# so the key doesn't have to be re-exported into every shell. Real environment
+# variables always win (override=False); a no-op if python-dotenv or .env is absent.
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except ImportError:  # pragma: no cover - dotenv is an optional convenience
+    pass
+
 from memory_agent.agent import MemoryAgent
 from memory_agent.dream import DreamLoop, DreamProposal
 from memory_agent.engine import MemoryEngine

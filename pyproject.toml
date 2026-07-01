@@ -15,6 +15,7 @@ dependencies = [
     "numpy>=1.26",          # scoring / vector math
     "tiktoken>=0.7",        # approximate token counting for budget packing
     "pydantic>=2.7",        # typed memory records
+    "python-dotenv>=1.0",   # load DASHSCOPE_* from .env so the key isn't re-exported per shell
 ]
 
 [project.optional-dependencies]
