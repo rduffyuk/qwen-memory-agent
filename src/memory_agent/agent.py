@@ -109,6 +109,7 @@ class MemoryAgent:
                     ttl_seconds=arguments.get("ttl_seconds"),
                     salience_below=arguments.get("salience_below"),
                     subject=arguments.get("subject"),
+                    query=arguments.get("query"),
                 )
             }
 
@@ -191,7 +192,12 @@ def _tool_specs() -> list[dict[str, Any]]:
             "type": "function",
             "function": {
                 "name": "forget",
-                "description": "Delete memories by id, age, salience threshold, or subject.",
+                "description": (
+                    "Delete memories. Prefer 'query' (natural-language description of the "
+                    "memory to forget — deletes the closest semantic match) unless you know "
+                    "the exact record_id or stored subject string. If the result reports "
+                    "forgotten: 0, nothing was deleted — tell the user honestly."
+                ),
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -199,6 +205,7 @@ def _tool_specs() -> list[dict[str, Any]]:
                         "ttl_seconds": {"type": "integer", "minimum": 0},
                         "salience_below": {"type": "number", "minimum": 0.0, "maximum": 1.0},
                         "subject": {"type": "string"},
+                        "query": {"type": "string"},
                     },
                 },
             },

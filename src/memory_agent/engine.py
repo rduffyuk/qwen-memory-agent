@@ -126,9 +126,21 @@ class MemoryEngine:
         salience_below: float | None = None,
         decayed_below: float | None = None,
         subject: str | None = None,
+        query: str | None = None,
     ) -> int:
         if record_id is not None:
             return int(self.store.delete(record_id))
+
+        if query is not None:
+            # Semantic forget: the caller describes the memory in natural language and
+            # the closest active match above the supersession threshold is deleted —
+            # the read-path twin of semantic supersession. The model cannot reliably
+            # guess stored subject strings (a dream-merge may file under 'user'), so
+            # exact-subject forgetting alone leaves records unremovable via chat.
+            results = self.store.search(self.qwen.embed(query), limit=1)
+            if results and results[0].cosine >= self.supersede_threshold:
+                return int(self.store.delete(results[0].record.id))
+            return 0
 
         now = datetime.now(timezone.utc)
         # subject with no other criteria means "delete everything under this subject" —

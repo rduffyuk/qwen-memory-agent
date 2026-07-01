@@ -259,3 +259,46 @@ def test_forget_by_subject_alone_deletes_that_subject_only() -> None:
     assert forgotten == 1
     assert engine.store.get(drop.id) is None
     assert engine.store.get(keep.id) is not None
+
+
+def test_forget_by_query_deletes_closest_match_above_threshold() -> None:
+    # Live bug, part 2: the model can't guess the stored subject string (a dream-merge
+    # filed the record under subject='user'), so forget(subject=<guess>) misses. A
+    # natural-language query must forget the closest matching memory semantically —
+    # the same trick semantic supersession uses on the write path.
+    engine = MemoryEngine(
+        qwen=VectorQwen(
+            {
+                "User likes anime, Overlord especially.": [1.0, 0.0],
+                "Ryan likes jazz while coding.": [0.0, 1.0],
+                "anime preferences": [0.98, 0.02],
+            }
+        ),
+        store=MemoryStore(location=":memory:"),
+    )
+    drop = engine.write("User likes anime, Overlord especially.", type="preference", subject="user")
+    keep = engine.write("Ryan likes jazz while coding.", type="preference", subject="music")
+
+    forgotten = engine.forget(query="anime preferences")
+
+    assert forgotten == 1
+    assert engine.store.get(drop.id) is None
+    assert engine.store.get(keep.id) is not None
+
+
+def test_forget_by_query_below_threshold_deletes_nothing() -> None:
+    engine = MemoryEngine(
+        qwen=VectorQwen(
+            {
+                "Ryan likes jazz while coding.": [0.0, 1.0],
+                "totally unrelated topic": [1.0, 0.0],
+            }
+        ),
+        store=MemoryStore(location=":memory:"),
+    )
+    keep = engine.write("Ryan likes jazz while coding.", type="preference", subject="music")
+
+    forgotten = engine.forget(query="totally unrelated topic")
+
+    assert forgotten == 0
+    assert engine.store.get(keep.id) is not None
