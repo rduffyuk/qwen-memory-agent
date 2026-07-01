@@ -243,3 +243,19 @@ def test_default_supersede_threshold_is_0_9_and_enables_retirement() -> None:
     stored_old = engine.store.get(old.id)
     assert stored_old is not None
     assert stored_old.superseded_by == new.id
+
+
+def test_forget_by_subject_alone_deletes_that_subject_only() -> None:
+    # Live bug (found testing the dreaming loop on ECS): the forget tool advertises
+    # "delete by subject", the model calls forget(subject=...) with no other args,
+    # but engine.forget only deleted when ttl/salience/decay criteria also matched —
+    # so subject-only forget silently returned 0 and the record was unremovable.
+    engine = MemoryEngine(qwen=FakeQwen(), store=MemoryStore(location=":memory:"))
+    keep = engine.write("Ryan likes jazz while coding.", type="preference", subject="music")
+    drop = engine.write("Ryan likes anime, Overlord especially.", type="preference", subject="user")
+
+    forgotten = engine.forget(subject="user")
+
+    assert forgotten == 1
+    assert engine.store.get(drop.id) is None
+    assert engine.store.get(keep.id) is not None

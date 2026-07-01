@@ -131,6 +131,11 @@ class MemoryEngine:
             return int(self.store.delete(record_id))
 
         now = datetime.now(timezone.utc)
+        # subject with no other criteria means "delete everything under this subject" —
+        # the forget tool advertises delete-by-subject, so a bare subject must act.
+        subject_only = subject is not None and (
+            ttl_seconds is None and salience_below is None and decayed_below is None
+        )
         to_delete: list[str] = []
         for record in self.store.list_records(include_superseded=True):
             if subject is not None and record.subject != subject:
@@ -138,7 +143,7 @@ class MemoryEngine:
             expired = ttl_seconds is not None and (now - record.ts).total_seconds() > ttl_seconds
             low_salience = salience_below is not None and record.salience < salience_below
             decayed = decayed_below is not None and effective_salience(record) < decayed_below
-            if expired or low_salience or decayed:
+            if subject_only or expired or low_salience or decayed:
                 to_delete.append(record.id)
 
         for delete_id in to_delete:
