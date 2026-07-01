@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import asdict
 from typing import Any
 
 from fastmcp import FastMCP
 
+from memory_agent.dream import DreamLoop, DreamProposal
 from memory_agent.engine import MemoryEngine
 
 
@@ -69,5 +71,17 @@ def create_mcp_server(engine: MemoryEngine) -> FastMCP:
         version: int = 1, records: list[dict[str, Any]] | None = None
     ) -> dict[str, int]:
         return {"imported": engine.import_json({"version": version, "records": records or []})}
+
+    @mcp.tool(name="memory.dream")
+    def dream() -> list[dict[str, Any]]:
+        return [asdict(proposal) for proposal in DreamLoop(engine).dream()]
+
+    @mcp.tool(name="memory.dream_apply")
+    def dream_apply(
+        proposals: list[dict[str, Any]],
+        approved_ids: list[str],
+    ) -> dict[str, Any]:
+        rebuilt = [DreamProposal(**proposal) for proposal in proposals]
+        return asdict(DreamLoop(engine).apply(rebuilt, approved_ids))
 
     return mcp

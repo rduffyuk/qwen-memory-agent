@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from dataclasses import asdict
 from typing import Any
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
 from memory_agent.agent import MemoryAgent
+from memory_agent.dream import DreamLoop, DreamProposal
 from memory_agent.engine import MemoryEngine
 from memory_agent.mcp_server import create_mcp_server
 from memory_agent.qwen import ChatTurn, QwenClient
@@ -85,6 +87,11 @@ class ChatResponse(BaseModel):
     usage: dict[str, int] = Field(default_factory=_zero_usage_delta)
 
 
+class DreamApplyRequest(BaseModel):
+    proposals: list[dict[str, Any]]
+    approved_ids: list[str]
+
+
 def create_app(engine: MemoryEngine | None = None) -> FastAPI:
     app = FastAPI(title="qwen-memory-agent")
     resolved_engine = engine or MemoryEngine(qwen=LazyQwenClient(), store=MemoryStore())
@@ -122,6 +129,17 @@ def create_app(engine: MemoryEngine | None = None) -> FastAPI:
     def import_memory(data: dict[str, Any]) -> dict[str, Any]:
         imported = resolved_engine.import_json(data)
         return {"imported": imported, "stats": resolved_engine.store.stats()}
+
+    @app.post("/dream")
+    def dream() -> dict[str, Any]:
+        proposals = DreamLoop(resolved_engine).dream()
+        return {"proposals": [asdict(proposal) for proposal in proposals]}
+
+    @app.post("/dream/apply")
+    def dream_apply(request: DreamApplyRequest) -> dict[str, Any]:
+        proposals = [DreamProposal(**proposal) for proposal in request.proposals]
+        report = DreamLoop(resolved_engine).apply(proposals, request.approved_ids)
+        return asdict(report)
 
     return app
 
