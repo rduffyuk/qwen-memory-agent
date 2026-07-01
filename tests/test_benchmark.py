@@ -60,6 +60,37 @@ def test_run_end_to_end_structure(tmp_path) -> None:
         assert set(results["baselines"][name]) == {str(b) for b in BUDGETS}
 
 
+def test_run_pins_scaled_benchmark_curve(tmp_path) -> None:
+    baselines = run(results_dir=tmp_path / "out")["baselines"]
+
+    assert baselines == {
+        "B0": {
+            "8": {"recall_accuracy": 0.0, "staleness_rate": 0.0},
+            "16": {"recall_accuracy": 0.0, "staleness_rate": 0.0},
+            "32": {"recall_accuracy": 0.0, "staleness_rate": 0.0},
+            "64": {"recall_accuracy": 0.0, "staleness_rate": 0.0},
+        },
+        "B1": {
+            "8": {"recall_accuracy": 0.0, "staleness_rate": 0.25},
+            "16": {"recall_accuracy": 0.375, "staleness_rate": 0.25},
+            "32": {"recall_accuracy": 0.9583333333333334, "staleness_rate": 0.25},
+            "64": {"recall_accuracy": 1.0, "staleness_rate": 0.25},
+        },
+        "B2": {
+            "8": {"recall_accuracy": 0.875, "staleness_rate": 0.125},
+            "16": {"recall_accuracy": 1.0, "staleness_rate": 0.25},
+            "32": {"recall_accuracy": 1.0, "staleness_rate": 0.25},
+            "64": {"recall_accuracy": 1.0, "staleness_rate": 0.25},
+        },
+        "B3": {
+            "8": {"recall_accuracy": 1.0, "staleness_rate": 0.0},
+            "16": {"recall_accuracy": 1.0, "staleness_rate": 0.0},
+            "32": {"recall_accuracy": 1.0, "staleness_rate": 0.0},
+            "64": {"recall_accuracy": 1.0, "staleness_rate": 0.0},
+        },
+    }
+
+
 def test_run_includes_capability_scores(tmp_path) -> None:
     results = run(results_dir=tmp_path / "out")
 
@@ -120,3 +151,37 @@ def test_persona_history_exceeds_smallest_budget(tmp_path) -> None:
     # the smallest budget, or the budget would never force a choice.
     persona = synthetic_personas()[0]
     assert len(build_history(persona)) > 1
+
+
+def test_synthetic_personas_are_scaled_beyond_toy_fixture() -> None:
+    personas = synthetic_personas()
+    queries = [query for persona in personas for query in persona["queries"]]
+    query_ids = [query["id"] for query in queries]
+    subjects_by_persona = {
+        persona["id"]: {session["subject"] for session in persona["sessions"]}
+        for persona in personas
+    }
+
+    assert 5 <= len(personas) <= 8
+    assert 20 <= len(queries) <= 40
+    assert len(query_ids) == len(set(query_ids))
+    assert any(
+        len(
+            [session["subject"] for session in persona["sessions"] if session["subject"] == "drink"]
+        )
+        >= 3
+        for persona in personas
+    )
+    assert any(
+        len(
+            [
+                session["subject"]
+                for session in persona["sessions"]
+                if session["subject"] == "commute"
+            ]
+        )
+        >= 3
+        for persona in personas
+    )
+    assert "drink" in subjects_by_persona["ryan"]
+    assert "drink" in subjects_by_persona["maya"]

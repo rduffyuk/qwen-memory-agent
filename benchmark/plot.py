@@ -1,6 +1,6 @@
 """Render the benchmark's context-efficiency curves to a PNG for the README / demo.
 
-Reads the JSON written by ``benchmark.run.run`` and plots recall accuracy and
+Reads the JSON written by ``benchmark.run.run`` and plots context recall and
 staleness rate vs token budget for B1 (full-history), B2 (naive top-k) and B3
 (ours). Run AFTER a benchmark run:
 
@@ -51,7 +51,11 @@ def plot(results_path: Path = RESULTS, out_path: Path = OUT) -> Path:
         ax_s.plot(budgets, stale, marker="o", color=color, label=label)
 
     for ax, title, ylabel in (
-        (ax_r, "Recall accuracy vs budget  (higher is better)", "recall accuracy"),
+        (
+            ax_r,
+            "Context recall vs budget  (retrieval-level, model-free; higher is better)",
+            "context recall",
+        ),
         (ax_s, "Staleness rate vs budget  (lower is better)", "staleness rate"),
     ):
         ax.set_xlabel("memory token budget")
@@ -63,7 +67,7 @@ def plot(results_path: Path = RESULTS, out_path: Path = OUT) -> Path:
         ax.legend(fontsize=8, loc="center right")
 
     fig.suptitle(
-        "Qwen MemoryAgent — context efficiency: B3 holds recall 1.0 / staleness 0.0 "
+        "Qwen MemoryAgent — context efficiency: B3 holds context recall 1.0 / staleness 0.0 "
         "at every budget",
         fontsize=11,
         fontweight="bold",

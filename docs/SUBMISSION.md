@@ -79,23 +79,33 @@ Synthetic multi-session personas state preferences, **update** some (the
 supersession test), and inject distractors; a held-out query set asks for the
 *current* preference. We score four systems — **B0** no-memory, **B1**
 full-history-stuffing, **B2** naive top-k RAG, **B3** ours (salience + recency +
-supersession) — on recall accuracy and **staleness rate** (using a superseded fact —
-lower is better) across a **shrinking token budget** (8/16/32/64), all systems
-competing under the same ceiling. Win condition: **B3 matches or beats B1/B2 on
-accuracy at every budget, with the lowest staleness.**
+supersession) — on **context recall** (retrieval-level, model-free) and
+**staleness rate** (retrieved context contains a superseded fact — lower is better)
+across a **shrinking token budget** (8/16/32/64), all systems competing under the
+same ceiling. The budget is metered with `tiktoken`'s `gpt-4o-mini` encoding, a
+consistent approximation for Qwen context accounting. Win condition: **B3 matches
+or beats B1/B2 on context recall at every budget, with the lowest staleness.**
 
 **Graded run** (`PYTHONPATH=src uv run --no-sync python -m benchmark.run`, deterministic + offline, zero spend);
 plot at `benchmark/results/context_efficiency.png`:
 
 | Budget | 8 | 16 | 32 | 64 |
 |---|:--:|:--:|:--:|:--:|
-| B1 full-history — recall / stale | 0.00 / 0.50 | 0.00 / 0.50 | 1.00 / 0.50 | 1.00 / 0.50 |
-| B2 naive top-k — recall / stale | 0.50 / 0.00 | 1.00 / 0.00 | 1.00 / 0.50 | 1.00 / 0.50 |
-| **B3 ours — recall / stale** | **1.00 / 0.00** | **1.00 / 0.00** | **1.00 / 0.00** | **1.00 / 0.00** |
+| B1 full-history — context recall / stale | 0.000 / 0.250 | 0.375 / 0.250 | 0.958 / 0.250 | 1.000 / 0.250 |
+| B2 naive top-k — context recall / stale | 0.875 / 0.125 | 1.000 / 0.250 | 1.000 / 0.250 | 1.000 / 0.250 |
+| **B3 ours — context recall / stale** | **1.000 / 0.000** | **1.000 / 0.000** | **1.000 / 0.000** | **1.000 / 0.000** |
 
-B3 holds recall 1.00 / staleness 0.00 at every budget. The sharpest finding: **B2's
-staleness *rises* with budget** (0.00 → 0.50) — with no supersession, more context pulls
-the retired fact back in. Only B3 stays correct *and* small — measured, not asserted.
+B3 holds context recall 1.000 / staleness 0.000 at every budget on the expanded
+six-persona, 24-query fixture. The sharpest finding still holds but is less dramatic
+than the original two-query toy curve: **B2's staleness *rises* with budget**
+(0.125 → 0.250, then plateaus) — with no supersession, more context pulls retired
+facts back in. Only B3 stays current *and* small — measured, not asserted.
+
+The semantic threshold is validated separately with live DashScope `text-embedding-v3`
+cosines in `docs/embedding-validation.md`: supersession pairs scored 0.879-0.908,
+while unrelated distractors scored 0.683-0.743. Because one pair landed below the
+default `SUPERSEDE_THRESHOLD=0.9`, the threshold is left unchanged but documented as
+conservative rather than treated as a proven universal constant.
 
 ### Built with
 Python · FastAPI · FastMCP · Qdrant · `openai` SDK → Qwen Cloud / DashScope

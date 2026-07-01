@@ -18,7 +18,7 @@ measurable engineering problem, and every capability maps to a Track-1 requireme
 - **Persistent across restarts** — set `MEMORY_PERSIST_PATH` and the store writes an atomic JSON snapshot on every change and reloads it on startup (rebuilding the vector index), so memories **survive a full server restart** — real persistence, not process-lifetime state.
 - **The dreaming loop (propose → approve)** — an out-of-band Qwen pass reviews the store and *proposes* consolidations (merge / forget / re-salience); a human approves, then only approved proposals are applied. It validates every proposal against live record ids, so it refuses to act on its own hallucinations. *"Autonomously accumulate experience"* — with a human in the loop.
 - **Token & model observability** — every Qwen call's `usage` (prompt / completion / total tokens, per model) is accumulated and exposed at `/usage`; `/chat` reports the per-request token delta.
-- **A reproducible benchmark** — synthetic multi-session personas, a held-out query set, and baselines (no-memory / full-history / naive-RAG / ours), scored on recall accuracy, **staleness rate**, and a **context-efficiency curve**.
+- **A reproducible benchmark** — synthetic multi-session personas, a held-out query set, and baselines (no-memory / full-history / naive-RAG / ours), scored on context recall (retrieval-level, model-free), **staleness rate**, and a **context-efficiency curve**.
 
 ## Architecture
 
@@ -85,27 +85,34 @@ compete under the **same shrinking token budget**, so this is a fair context-eff
 
 ![Context-efficiency curves](benchmark/results/context_efficiency.png)
 
-Recall accuracy and staleness rate (fraction of answers containing a *retired* fact; lower is
-better) vs the memory token budget, over the synthetic multi-session persona set in
-`benchmark/generate.py`:
+Context recall (retrieval-level, model-free) and staleness rate (fraction of retrieved contexts
+containing a *retired* fact; lower is better) vs the memory token budget, over the six-persona,
+24-query synthetic set in `benchmark/generate.py`. Token budgets use `tiktoken`'s
+`gpt-4o-mini` encoding as a consistent approximation for Qwen context accounting.
 
 | Budget (tokens) | 8 | 16 | 32 | 64 |
 |---|:--:|:--:|:--:|:--:|
-| B1 full-history — recall / staleness | 0.00 / 0.50 | 0.00 / 0.50 | 1.00 / 0.50 | 1.00 / 0.50 |
-| B2 naive top-k — recall / staleness | 0.50 / 0.00 | 1.00 / 0.00 | 1.00 / **0.50** | 1.00 / **0.50** |
-| **B3 ours — recall / staleness** | **1.00 / 0.00** | **1.00 / 0.00** | **1.00 / 0.00** | **1.00 / 0.00** |
+| B1 full-history — context recall / staleness | 0.000 / 0.250 | 0.375 / 0.250 | 0.958 / 0.250 | 1.000 / 0.250 |
+| B2 naive top-k — context recall / staleness | 0.875 / 0.125 | 1.000 / 0.250 | 1.000 / 0.250 | 1.000 / 0.250 |
+| **B3 ours — context recall / staleness** | **1.000 / 0.000** | **1.000 / 0.000** | **1.000 / 0.000** | **1.000 / 0.000** |
 
-**B3 holds recall 1.00 and staleness 0.00 at every budget** — it's the only system that recalls
-the current preference *and* never re-surfaces the retired one. Two things the naive baselines
-can't do:
+**B3 holds context recall 1.000 and staleness 0.000 at every budget** — it's the only system
+that recalls the current facts *and* never re-surfaces retired ones. Two things the naive
+baselines can't do:
 
 - **B1** (dump history chronologically) wastes its budget on the oldest facts, so it needs a
   large budget just to recall the current answer — and it permanently carries the stale one.
 - **B2** (keyword top-k) *gets staler as the budget grows*: with no notion of "replaced," extra
-  budget pulls the retired "coffee" fact back in, so its staleness climbs 0.00 → 0.50.
+  budget pulls retired facts back in, so its staleness climbs 0.125 → 0.250 and then plateaus.
 
 Only **supersession-aware forgetting + budget-constrained recall** keeps the working set both
 correct and small.
+
+The semantic supersession threshold is also checked against live DashScope `text-embedding-v3`
+embeddings in `docs/embedding-validation.md`. That run did **not** produce a perfect validation:
+supersession-pair cosines were 0.879-0.908, while unrelated distractors were 0.683-0.743. The
+default `SUPERSEDE_THRESHOLD=0.9` is therefore conservative and should be revisited with a larger
+set rather than treated as a proven universal constant.
 
 ## License
 
