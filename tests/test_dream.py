@@ -177,6 +177,33 @@ def test_apply_merge_only_when_approved() -> None:
     assert engine.store.get(unapproved.id) is not None
 
 
+def test_apply_merge_preserves_deliberate_zero_salience() -> None:
+    engine = make_engine()
+    first = engine.write("Ryan prefers coffee.", type="preference", subject="drink")
+    second = engine.write("Ryan prefers tea.", type="preference", subject="drink")
+    merge = DreamProposal(
+        id="merge-1",
+        kind="merge",
+        target_ids=[first.id, second.id],
+        rationale="Keep a compact current drink preference with no boost.",
+        merged_text="Ryan currently prefers tea.",
+        subject="drink",
+        type="preference",
+        new_salience=0.0,
+    )
+
+    report = DreamLoop(engine).apply([merge], approved_ids=["merge-1"])
+
+    assert report.merged == 1
+    merged_records = [
+        record
+        for record in engine.store.list_records()
+        if record.text == "Ryan currently prefers tea."
+    ]
+    assert len(merged_records) == 1
+    assert merged_records[0].salience == 0.0
+
+
 def test_apply_forget_and_resalience_preserves_vector() -> None:
     engine = make_engine()
     forgotten = engine.write("Ryan no longer needs this chore.", type="chore", subject="old")

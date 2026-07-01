@@ -4,8 +4,8 @@ import os
 from dataclasses import asdict
 from typing import Any
 
-from fastapi import FastAPI
-from pydantic import BaseModel, Field
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 # Load DASHSCOPE_* from a local .env when running the server (e.g. `uv run uvicorn`)
 # so the key doesn't have to be re-exported into every shell. Real environment
@@ -98,8 +98,24 @@ class ChatResponse(BaseModel):
     usage: dict[str, int] = Field(default_factory=_zero_usage_delta)
 
 
+class DreamProposalPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    kind: str
+    target_ids: list[str]
+    rationale: str
+    merged_text: str | None = None
+    subject: str | None = None
+    type: str | None = None
+    new_salience: float | None = None
+
+    def to_proposal(self) -> DreamProposal:
+        return DreamProposal(**self.model_dump())
+
+
 class DreamApplyRequest(BaseModel):
-    proposals: list[dict[str, Any]]
+    proposals: list[DreamProposalPayload]
     approved_ids: list[str]
 
 
@@ -146,7 +162,10 @@ def create_app(engine: MemoryEngine | None = None) -> FastAPI:
 
     @app.post("/memory/import")
     def import_memory(data: dict[str, Any]) -> dict[str, Any]:
-        imported = resolved_engine.import_json(data)
+        try:
+            imported = resolved_engine.import_json(data)
+        except (KeyError, TypeError, ValueError, ValidationError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {"imported": imported, "stats": resolved_engine.store.stats()}
 
     @app.post("/dream")
@@ -156,7 +175,7 @@ def create_app(engine: MemoryEngine | None = None) -> FastAPI:
 
     @app.post("/dream/apply")
     def dream_apply(request: DreamApplyRequest) -> dict[str, Any]:
-        proposals = [DreamProposal(**proposal) for proposal in request.proposals]
+        proposals = [proposal.to_proposal() for proposal in request.proposals]
         report = DreamLoop(resolved_engine).apply(proposals, request.approved_ids)
         return asdict(report)
 

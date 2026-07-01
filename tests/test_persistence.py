@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -106,6 +108,23 @@ def test_persistent_store_creates_missing_parent_directory(tmp_path) -> None:
 
     assert persist_path.exists()
     assert MemoryStore(persist_path=str(persist_path)).get(record.id) == record
+
+
+def test_persistent_store_serializes_parallel_mutations_with_lock(tmp_path) -> None:
+    persist_path = tmp_path / "memory.json"
+    store = MemoryStore(persist_path=str(persist_path))
+
+    assert isinstance(store._lock, type(threading.RLock()))  # noqa: SLF001
+
+    def write_record(index: int) -> None:
+        store.upsert(make_record(f"Record {index}.", subject=f"subject-{index}"), [float(index)])
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        list(executor.map(write_record, range(12)))
+
+    snapshot = json.loads(persist_path.read_text(encoding="utf-8"))
+    assert len(snapshot["records"]) == 12
+    assert MemoryStore(persist_path=str(persist_path)).stats()["total"] == 12
 
 
 def test_persistent_store_malformed_file_raises_clear_error(tmp_path) -> None:

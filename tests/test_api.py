@@ -114,3 +114,33 @@ def test_create_app_default_supersede_threshold_is_0_9(monkeypatch) -> None:
     monkeypatch.delenv("SUPERSEDE_THRESHOLD", raising=False)
     app = create_app()
     assert app.state.engine.supersede_threshold == 0.9
+
+
+def test_dream_apply_malformed_proposal_returns_422() -> None:
+    client = TestClient(create_app(_engine()), raise_server_exceptions=False)
+
+    response = client.post(
+        "/dream/apply",
+        json={
+            "proposals": [
+                {
+                    "id": "bad-1",
+                    "kind": "forget",
+                    "target_ids": "not-a-list",
+                    "rationale": "Malformed client payload.",
+                }
+            ],
+            "approved_ids": ["bad-1"],
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_memory_import_malformed_payload_returns_400() -> None:
+    client = TestClient(create_app(_engine()), raise_server_exceptions=False)
+
+    response = client.post("/memory/import", json={"records": "not-a-list"})
+
+    assert response.status_code == 400
+    assert "records list" in response.json()["detail"]

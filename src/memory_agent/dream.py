@@ -110,7 +110,7 @@ class DreamLoop:
                     proposal.merged_text or "",
                     type=proposal.type or "fact",
                     subject=proposal.subject,
-                    salience=proposal.new_salience or 0.5,
+                    salience=0.5 if proposal.new_salience is None else proposal.new_salience,
                 )
                 for target_id in proposal.target_ids:
                     if self.engine.store.get(target_id) is not None:
