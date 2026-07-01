@@ -19,6 +19,10 @@ create an ECS instance:
 - **Image**: Ubuntu 22.04 LTS.
 - **Network**: assign a public IP. Security group: allow inbound TCP **8000**
   (the API) and **22** (SSH) from your IP.
+  - ⚠️ **Lock both ports to your own IP/32, not `0.0.0.0/0`** — the box holds a live
+    DashScope key. If your home IP is dynamic (most consumer ISPs), it can rotate
+    between sessions; if SSH/curl suddenly can't connect, re-check the security-group
+    source against your current IP (`curl -s ifconfig.me`) before debugging anything else.
 
 ## 2. Install + run (on the ECS box, over SSH)
 ```bash
@@ -43,14 +47,46 @@ uv run uvicorn memory_agent.api:app --host 0.0.0.0 --port 8000
 For a persistent run, wrap it in a `systemd` unit or `tmux`; or use the
 `docker-compose.yml` in this folder.
 
-## 3. Smoke-test it's live
-From your laptop (replace with the ECS public IP):
+## 2a. Redeploy after an update (box already running)
+When `main` moves ahead of what's on the box (e.g. new endpoints), pull + restart:
 ```bash
-curl http://<ECS_PUBLIC_IP>:8000/health
-# -> {"status":"ok"}
-curl -X POST http://<ECS_PUBLIC_IP>:8000/chat \
-  -H 'content-type: application/json' \
-  -d '{"message":"Remember I prefer tea, then tell me my drink.","session_id":"demo"}'
+cd ~/qwen-memory-agent
+git pull                       # fetch the latest main
+uv sync                        # pick up any dependency changes
+# restart the server: Ctrl-C the tmux/foreground process, or if it's a systemd unit:
+sudo systemctl restart qwen-memory-agent
+```
+Confirm the new surface is live: `curl http://<ECS_PUBLIC_IP>:8000/dream` should return
+`200` (older builds without the dreaming loop return `404`).
+
+## 3. Smoke-test it's live (and show off the memory engine)
+From your laptop (replace with the ECS public IP). This sequence is also a good
+**demo script** — it exercises supersession, budget recall, portability, usage
+metering, and the dreaming loop in order:
+```bash
+IP=<ECS_PUBLIC_IP>
+
+# 1. liveness
+curl http://$IP:8000/health                     # -> {"status":"ok"}
+
+# 2. agentic memory + supersession: teach a preference, then update it
+curl -sX POST http://$IP:8000/chat -H 'content-type: application/json' \
+  -d '{"message":"Remember I prefer coffee in the morning.","session_id":"demo"}'
+curl -sX POST http://$IP:8000/chat -H 'content-type: application/json' \
+  -d '{"message":"Actually I prefer tea now. What is my morning drink?","session_id":"demo"}'
+# -> answers "tea"; the retired "coffee" fact is not surfaced
+
+# 3. token & model observability (per-model usage accumulates across the calls above)
+curl -s http://$IP:8000/usage
+
+# 4. portable memory: export the whole store (JSON + Markdown, vectors preserved)
+curl -s http://$IP:8000/memory/export
+
+# 5. the dreaming loop: propose consolidations, then apply only what you approve
+curl -s http://$IP:8000/dream                    # -> {"proposals":[{ "id": ..., "kind": ... }]}
+# review the proposals, then apply the approved ids:
+curl -sX POST http://$IP:8000/dream/apply -H 'content-type: application/json' \
+  -d '{"proposals":[<paste proposals from /dream>],"approved_ids":["<id-to-approve>"]}'
 ```
 
 ## 4. Capture the deploy proof (separate from the demo video)
