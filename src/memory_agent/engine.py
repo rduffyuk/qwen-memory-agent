@@ -105,6 +105,49 @@ class MemoryEngine:
             self.store.delete(delete_id)
         return len(to_delete)
 
+    def export_json(self) -> dict[str, object]:
+        return {
+            "version": 1,
+            "records": [
+                {
+                    "record": record.model_dump(mode="json"),
+                    "vector": vector,
+                }
+                for record, vector in self.store.export_records()
+            ],
+        }
+
+    def import_json(self, data: dict[str, object]) -> int:
+        imported = 0
+        records = data.get("records", [])
+        if not isinstance(records, list):
+            raise ValueError("memory import payload must contain a records list")
+
+        for entry in records:
+            if not isinstance(entry, dict):
+                raise ValueError("memory import entries must be objects")
+            record = MemoryRecord.model_validate(entry["record"])
+            vector = list(entry["vector"])
+            self.store.upsert(record, vector)
+            imported += 1
+        return imported
+
+    def export_markdown(self) -> str:
+        stats = self.store.stats()
+        lines = [
+            f"# Memory export — {stats['active']} active, {stats['superseded']} superseded",
+        ]
+        records = sorted(
+            self.store.list_records(),
+            key=lambda record: (-record.salience, record.text),
+        )
+        for record in records:
+            lines.append(
+                f"- [{record.type} · sal {record.salience:.2f} · used {record.access_count}] "
+                f"{record.text}"
+            )
+        return "\n".join(lines)
+
     def count_tokens(self, text: str) -> int:
         if not text:
             return 0

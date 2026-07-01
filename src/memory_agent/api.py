@@ -111,6 +111,18 @@ def create_app(engine: MemoryEngine | None = None) -> FastAPI:
             usage=_usage_delta(before, after),
         )
 
+    @app.get("/memory/export")
+    def export_memory() -> dict[str, Any]:
+        return {
+            "markdown": resolved_engine.export_markdown(),
+            "json": resolved_engine.export_json(),
+        }
+
+    @app.post("/memory/import")
+    def import_memory(data: dict[str, Any]) -> dict[str, Any]:
+        imported = resolved_engine.import_json(data)
+        return {"imported": imported, "stats": resolved_engine.store.stats()}
+
     return app
 
 

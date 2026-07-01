@@ -93,6 +93,9 @@ class MemoryStore:
             return records
         return [record for record in records if not record.superseded_by]
 
+    def export_records(self) -> list[tuple[MemoryRecord, list[float]]]:
+        return [(record, list(self._vectors[record.id])) for record in self._records.values()]
+
     def active_by_subject_type(self, subject: str, type: str) -> list[MemoryRecord]:
         return [
             record

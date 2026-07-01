@@ -53,4 +53,17 @@ def create_mcp_server(engine: MemoryEngine) -> FastMCP:
     def stats() -> dict[str, int]:
         return engine.store.stats()
 
+    @mcp.tool(name="memory.export")
+    def export() -> dict[str, Any]:
+        return {
+            "markdown": engine.export_markdown(),
+            "json": engine.export_json(),
+        }
+
+    @mcp.tool(name="memory.import")
+    def import_memory(
+        version: int = 1, records: list[dict[str, Any]] | None = None
+    ) -> dict[str, int]:
+        return {"imported": engine.import_json({"version": version, "records": records or []})}
+
     return mcp
