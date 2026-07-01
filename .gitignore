@@ -4,6 +4,7 @@ __pycache__/
 *.pyc
 .venv/
 .qdrant/
+.DS_Store
 !.env.example
 
 # generated benchmark output (commit real results explicitly with: git add -f)
