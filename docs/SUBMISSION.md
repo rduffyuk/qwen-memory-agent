@@ -24,9 +24,11 @@ memory as a first-class, measurable engineering problem.
 - **Agentic memory via Qwen function-calling.** The agent itself decides when to
   call `remember` / `recall` / `forget` through Qwen's tool-calling — it's an agent
   *with* memory, not a database with an LLM bolted on.
-- **Supersession-aware forgetting.** When a new fact contradicts an existing one of
-  the same subject/type (e.g. "prefers tea" replacing "prefers coffee"), the old
-  record is retired (`superseded_by`) so retrieval stops surfacing the stale value.
+- **Supersession-aware forgetting (exact + semantic).** When a new fact contradicts
+  an existing one, the old record is retired (`superseded_by`). Exact `(subject, type)`
+  match handles the clean case; a **cosine-similarity** pass (configurable
+  `SUPERSEDE_THRESHOLD`) also retires near-paraphrases the model filed under a different
+  subject — the case that defeats exact matching in a live agent loop.
 - **Graded decay + reinforce-on-recall.** `effective_salience = salience · 0.5^(age /
   half_life)` with per-type half-lives (`preference` pinned); recalling a memory
   refreshes it. Hot memories persist, cold ones fade — *timely forgetting.*
@@ -39,6 +41,9 @@ memory as a first-class, measurable engineering problem.
   them until a configurable token budget is hit — relevant context stays small.
 - **Portable memory.** The whole store round-trips as JSON (vectors preserved, no
   re-embedding) or renders to Markdown — memory moves across sessions and machines.
+- **Persistent across restarts.** With `MEMORY_PERSIST_PATH` set, the store writes an
+  atomic JSON snapshot on every change and reloads it on startup (rebuilding the vector
+  index) — memories survive a full server restart, not just process lifetime.
 - **The dreaming loop (propose → approve).** An offline Qwen pass proposes
   consolidations (merge / forget / re-salience); a human approves, then only
   approved proposals are applied. It validates proposals against live record ids, so

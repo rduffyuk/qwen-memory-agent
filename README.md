@@ -10,11 +10,12 @@ Most memory agents are "stuff everything into RAG and hope." This one treats mem
 measurable engineering problem, and every capability maps to a Track-1 requirement:
 
 - **Agentic memory via Qwen function-calling** — the model invokes `remember` / `recall` / `forget` tools through a real agent loop. It's an agent *with* memory, not a database with an LLM bolted on.
-- **Supersession-aware forgetting** — when a new fact contradicts an old one of the same subject/kind, the old record is retired (not just buried under recency), so recall stops surfacing the stale value.
+- **Supersession-aware forgetting (exact *and* semantic)** — when a new fact contradicts an old one, the old record is retired. Exact `(subject, type)` match handles the clean case; a **cosine-similarity** pass (configurable `SUPERSEDE_THRESHOLD`) also retires near-paraphrases the model filed under a *different* subject — the case that defeats exact matching in a real agent loop.
 - **Graded, time-based decay + reinforce-on-recall** — `effective_salience = salience · 0.5^(age / half_life)` (per-type half-lives; `preference` pinned). Recalling a memory refreshes it (`access_count`, `last_accessed`), so hot memories stay and cold ones fade — *"timely forgetting of outdated information."*
 - **Typed retrieval — a second self-correcting layer** — a type-aware ranking prior (a durable `preference` outranks a throwaway `episodic` note of equal cosine) *plus* a retrieval-time "one-active-per-`(subject, type)`, keep-newest" veto that catches stale contradictions the write path can miss (e.g. records that arrive via import). *"Recall the most critical memories under limited context."*
 - **Budget-constrained recall** — retrieval scores memories by `α·cosine + β·recency + γ·effective_salience + δ·type_prior` and greedily packs them until a configurable token budget is hit, so context stays small *and* relevant.
 - **Portable memory (export / import)** — the whole store round-trips as JSON (vectors preserved, no re-embedding) or renders to Markdown, so memory moves *across sessions and machines.*
+- **Persistent across restarts** — set `MEMORY_PERSIST_PATH` and the store writes an atomic JSON snapshot on every change and reloads it on startup (rebuilding the vector index), so memories **survive a full server restart** — real persistence, not process-lifetime state.
 - **The dreaming loop (propose → approve)** — an offline Qwen pass reviews the store and *proposes* consolidations (merge / forget / re-salience); a human approves, then only approved proposals are applied. It validates every proposal against live record ids, so it refuses to act on its own hallucinations. *"Autonomously accumulate experience"* — with a human in the loop.
 - **Token & model observability** — every Qwen call's `usage` (prompt / completion / total tokens, per model) is accumulated and exposed at `/usage`; `/chat` reports the per-request token delta.
 - **A reproducible benchmark** — synthetic multi-session personas, a held-out query set, and baselines (no-memory / full-history / naive-RAG / ours), scored on recall accuracy, **staleness rate**, and a **context-efficiency curve**.
@@ -30,8 +31,9 @@ flowchart TB
         AGENT["MemoryAgent loop<br/>Qwen function-calling"]
         DREAM["Dreaming loop<br/>propose → approve consolidation"]
         MCP["FastMCP server<br/>remember / recall / forget / stats<br/>export / import / dream / dream_apply"]
-        ENG["Memory Engine<br/>write · retrieve · forget<br/>supersession + decay + typed<br/>retrieval + token-budget packing"]
-        QD[("Qdrant<br/>vector store")]
+        ENG["Memory Engine<br/>write · retrieve · exact + semantic supersession<br/>typed retrieval · decay + reinforce · dreaming loop<br/>token-budget packing"]
+        QD[("Qdrant<br/>vector store (embedded)")]
+        SNAP[("Disk snapshot<br/>memory.json · survives restart")]
     end
 
     DS["Qwen Cloud / DashScope-intl<br/>reasoning model + text-embedding<br/>(usage metered per call)"]
@@ -47,9 +49,10 @@ flowchart TB
     DREAM <-->|"review memories"| DS
     ENG <-->|"embed"| DS
     ENG <--> QD
+    ENG <-->|"save on write / load on start"| SNAP
 ```
 
-The agent loop (`/chat`) lets Qwen choose tool calls; the same memory engine is also exposed directly over MCP for any MCP client, and the dreaming loop drives it as a maintenance pass. The Qwen client has bounded retry/backoff for resilience and meters token usage on every call.
+The agent loop (`/chat`) lets Qwen choose tool calls; the same memory engine is also exposed directly over MCP for any MCP client, and the dreaming loop drives it as a maintenance pass. With `MEMORY_PERSIST_PATH` set, the engine snapshots to disk on every change and rehydrates on startup, so the store survives a restart. The Qwen client has bounded retry/backoff for resilience and meters token usage on every call.
 
 ## HTTP + MCP surface
 
