@@ -7,7 +7,7 @@ adjust salience), then applies ONLY the proposals a human approves. Maps Track-1
 information" while staying human-in-the-loop. Pure Python, no new deps.
 
 **Jira:** VW-1090 (use this key; do NOT create a new issue).
-**Repo:** this one (`~/qwen-memory-agent`, branch `main`). Public MIT repo — import nothing proprietary.
+**Repo:** this one (`~/qwen-memory-agent`, current branch). Public MIT repo — import nothing proprietary.
 
 ## Why (design rationale — keep this intent)
 Consolidation must be **two-phase and non-autonomous**: `dream()` returns
@@ -94,7 +94,7 @@ class DreamReport:
 - `memory.dream_apply(proposals, approved_ids)` → report dict.
 - Keep the existing five tools unchanged.
 
-## Acceptance — gate: `uv run pytest -q` (FULL suite, must pass, FULLY OFFLINE)
+## Acceptance — gate: `PYTHONPATH=src uv run --no-sync pytest -q tests/` (FULL suite, must pass, FULLY OFFLINE)
 New `tests/test_dream.py` (scripted FakeQwen whose `chat()` returns a JSON string —
 no network) MUST cover:
 1. **`dream()` parses proposals and does NOT mutate the store** — assert

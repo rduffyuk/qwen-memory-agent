@@ -17,7 +17,7 @@ Build the core of a persistent-memory agent on Qwen Cloud: a memory engine (writ
 - `benchmark/{generate,baselines,run,score}.py` — synthetic personas + multi-session scripts (some preferences updated = supersession test) + distractors; baselines **B0** no-memory, **B1** full-history, **B2** naive top-k RAG, **B3** ours; metrics recall accuracy, **staleness rate**, context-efficiency (accuracy @ 512/1k/2k token budgets). Writes JSON to `benchmark/results/`.
 - `tests/` — the gate.
 
-## Acceptance criteria — gate: `uv run pytest -q tests/` (must pass, fully offline)
+## Acceptance criteria — gate: `PYTHONPATH=src uv run --no-sync pytest -q tests/` (must pass, fully offline)
 Tests MUST cover, at minimum:
 1. **supersession** — writing a contradicting fact of the same subject/type retires the prior one (`superseded_by` set; retrieve no longer returns the stale value).
 2. **budget packing** — `retrieve()` output never exceeds the configured token budget (assert on a case where candidates exceed it).

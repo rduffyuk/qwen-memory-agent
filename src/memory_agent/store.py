@@ -63,13 +63,26 @@ class MemoryStore:
         limit: int = 20,
         include_superseded: bool = False,
     ) -> list[SearchResult]:
+        if not self._records or self._vector_size is None:
+            return []
+
         results: list[SearchResult] = []
-        for record_id, record in self._records.items():
+        query_limit = max(limit, len(self._records))
+        points = self.client.query_points(
+            collection_name=self.collection_name,
+            query=vector,
+            limit=query_limit,
+        ).points
+        for point in points:
+            record = self._records.get(str(point.id))
+            if record is None:
+                continue
             if record.superseded_by and not include_superseded:
                 continue
-            stored_vector = self._vectors[record_id]
-            results.append(SearchResult(record=record, cosine=_cosine(vector, stored_vector)))
-        return sorted(results, key=lambda item: item.cosine, reverse=True)[:limit]
+            results.append(SearchResult(record=record, cosine=float(point.score)))
+            if len(results) >= limit:
+                break
+        return results
 
     def delete(self, record_id: str) -> bool:
         existed = record_id in self._records
@@ -172,6 +185,9 @@ class MemoryStore:
     def _save(self) -> None:
         if self.persist_path is None:
             return
+        parent = os.path.dirname(self.persist_path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
         tmp_path = self.persist_path + ".tmp"
         with open(tmp_path, "w", encoding="utf-8") as file:
             json.dump(self._snapshot(), file)

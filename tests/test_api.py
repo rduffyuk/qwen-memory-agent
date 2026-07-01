@@ -43,6 +43,32 @@ class FakeQwen:
         return type("Turn", (), {"content": "fake-answer", "tool_calls": []})()
 
 
+class RecallWithoutBudgetQwen(FakeQwen):
+    def chat(
+        self,
+        messages: list[dict[str, object]],
+        tools: list[dict[str, object]] | None = None,
+        model: str | None = None,
+    ) -> object:
+        self.chat_calls += 1
+        if self.chat_calls == 1:
+            return type(
+                "Turn",
+                (),
+                {
+                    "content": None,
+                    "tool_calls": [
+                        ToolCall(
+                            id="call_recall",
+                            name="recall",
+                            arguments={"query": "What about tea?"},
+                        )
+                    ],
+                },
+            )()
+        return type("Turn", (), {"content": "fake-answer", "tool_calls": []})()
+
+
 def _engine() -> MemoryEngine:
     return MemoryEngine(qwen=FakeQwen(), store=MemoryStore(location=":memory:"))
 
@@ -68,6 +94,17 @@ def test_chat_returns_answer_and_relevant_memories() -> None:
     assert body["answer"] == "fake-answer"
     assert body["tool_calls_made"] == ["recall"]
     assert any("tea" in memory["text"].lower() for memory in body["memories"])
+
+
+def test_chat_request_token_budget_caps_agent_recall_when_tool_omits_budget() -> None:
+    engine = MemoryEngine(qwen=RecallWithoutBudgetQwen(), store=MemoryStore(location=":memory:"))
+    engine.write("Ryan prefers tea.", type="preference", subject="drink")
+    client = TestClient(create_app(engine))
+
+    response = client.post("/chat", json={"message": "What about tea?", "token_budget": 1})
+
+    assert response.status_code == 200
+    assert response.json()["memories"] == []
 
 
 def test_create_app_default_supersede_threshold_is_0_9(monkeypatch) -> None:

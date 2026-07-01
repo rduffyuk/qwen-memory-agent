@@ -20,7 +20,13 @@ class MemoryAgent:
         self.engine = engine
         self.max_iters = max(1, max_iters)
 
-    def run(self, user_message: str, *, session_id: str | None = None) -> AgentResult:
+    def run(
+        self,
+        user_message: str,
+        *,
+        session_id: str | None = None,
+        token_budget: int | None = None,
+    ) -> AgentResult:
         messages: list[dict[str, Any]] = [
             {
                 "role": "system",
@@ -49,7 +55,11 @@ class MemoryAgent:
             messages.append(_assistant_tool_call_message(turn))
             for tool_call in turn.tool_calls:
                 tool_calls_made.append(tool_call.name)
-                result = self._execute_tool_call(tool_call, session_id=session_id)
+                result = self._execute_tool_call(
+                    tool_call,
+                    session_id=session_id,
+                    token_budget=token_budget,
+                )
                 if tool_call.name == "recall" and isinstance(result, list):
                     memories = result
                 messages.append(
@@ -67,7 +77,13 @@ class MemoryAgent:
             memories=memories,
         )
 
-    def _execute_tool_call(self, tool_call: ToolCall, *, session_id: str | None) -> Any:
+    def _execute_tool_call(
+        self,
+        tool_call: ToolCall,
+        *,
+        session_id: str | None,
+        token_budget: int | None,
+    ) -> Any:
         arguments = tool_call.arguments
         if tool_call.name == "remember":
             record = self.engine.write(
@@ -82,7 +98,7 @@ class MemoryAgent:
         if tool_call.name == "recall":
             records = self.engine.retrieve(
                 str(arguments["query"]),
-                token_budget=arguments.get("token_budget"),
+                token_budget=_resolve_token_budget(arguments.get("token_budget"), token_budget),
             )
             return [record.model_dump(mode="json") for record in records]
 
@@ -97,6 +113,14 @@ class MemoryAgent:
             }
 
         return {"error": f"unknown tool: {tool_call.name}"}
+
+
+def _resolve_token_budget(tool_budget: Any, request_budget: int | None) -> int | None:
+    budgets = []
+    for value in (tool_budget, request_budget):
+        if value is not None:
+            budgets.append(int(value))
+    return min(budgets) if budgets else None
 
 
 def _coerce_turn(value: Any) -> ChatTurn:

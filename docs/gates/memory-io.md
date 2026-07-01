@@ -44,7 +44,7 @@ No unrelated refactors.
 4. `mcp_server.py`: add `memory.export` (returns the same `{markdown, json}`) and
    `memory.import` (takes the json dict, returns `{"imported": int}`).
 
-## Acceptance criteria (gate: `uv run pytest -q` — ALL pass)
+## Acceptance criteria (gate: `PYTHONPATH=src uv run --no-sync pytest -q tests/` — ALL pass)
 
 1. Round-trip: write several memories (incl. a superseded pair via same
    subject/type), `export_json()`, `import_json()` into a **fresh** engine (new

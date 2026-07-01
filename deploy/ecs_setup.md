@@ -37,8 +37,10 @@ cd qwen-memory-agent
 uv sync
 
 # secret — set the key as an env var (NEVER commit it)
-export DASHSCOPE_API_KEY="sk-...your-key..."
+export DASHSCOPE_API_KEY="<your-dashscope-api-key>"
 export DASHSCOPE_BASE_URL="https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+export MEMORY_PERSIST_PATH="$PWD/memory.json"
+export SUPERSEDE_THRESHOLD="0.9"
 
 # run the backend, reachable on the public IP
 uv run uvicorn memory_agent.api:app --host 0.0.0.0 --port 8000

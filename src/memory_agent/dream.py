@@ -38,6 +38,8 @@ class DreamLoop:
 
     def dream(self) -> list[DreamProposal]:
         records = self.engine.store.list_records()
+        if not records:
+            return []
         active_ids = {record.id for record in records}
         digest = "\n".join(
             f"{record.id} · {record.type} · {record.subject} · "

@@ -124,7 +124,11 @@ def create_app(engine: MemoryEngine | None = None) -> FastAPI:
     @app.post("/chat", response_model=ChatResponse)
     def chat(request: ChatRequest) -> ChatResponse:
         before = _usage_summary(resolved_engine.qwen)
-        result = MemoryAgent(resolved_engine).run(request.message, session_id=request.session_id)
+        result = MemoryAgent(resolved_engine).run(
+            request.message,
+            session_id=request.session_id,
+            token_budget=request.token_budget,
+        )
         after = _usage_summary(resolved_engine.qwen)
         return ChatResponse(
             answer=result.answer,

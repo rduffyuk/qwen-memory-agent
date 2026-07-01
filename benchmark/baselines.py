@@ -53,10 +53,7 @@ def b2_naive_top_k(query: str, history: Iterable[dict[str, str]], *, token_budge
     # so a larger budget surfaces *more* — including retired facts.
     query_terms = set(query.lower().split())
     scored = sorted(
-        (
-            (len(query_terms & set(item["text"].lower().split())), item["text"])
-            for item in history
-        ),
+        ((len(query_terms & set(item["text"].lower().split())), item["text"]) for item in history),
         reverse=True,
     )
     return _pack([text for _, text in scored], token_budget)

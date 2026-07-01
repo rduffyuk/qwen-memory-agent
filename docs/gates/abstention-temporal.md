@@ -7,7 +7,7 @@ demand). Add the two small engine capabilities these require. Pure Python, offli
 zero Qwen spend.
 
 **Jira:** VW-1090 (use this key; do NOT create a new issue).
-**Repo:** this one (`~/qwen-memory-agent`, branch `main`). Public MIT repo.
+**Repo:** this one (`~/qwen-memory-agent`, current branch). Public MIT repo.
 
 ## NON-NEGOTIABLE honesty + compatibility constraints
 1. **The existing context-efficiency curve must stay byte-identical.** Do NOT change
@@ -88,7 +88,7 @@ Add `capability_cases() -> dict[str, list[dict]]` (SEPARATE from `synthetic_pers
     joined. (Only B3 is scored for temporal — see honesty constraint #2.)
 - `latest.json` stays a stable sorted dump.
 
-## Acceptance — gate: `uv run pytest -q` (FULL suite, must pass, FULLY OFFLINE)
+## Acceptance — gate: `PYTHONPATH=src uv run --no-sync pytest -q tests/` (FULL suite, must pass, FULLY OFFLINE)
 Existing tests unchanged + NEW tests:
 - `test_engine.py`: (a) `retrieve(min_relevance=high)` returns `[]` for an
   unrelated/zero-overlap query while `min_relevance=0.0` (default) is unchanged;

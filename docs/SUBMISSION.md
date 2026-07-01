@@ -44,7 +44,7 @@ memory as a first-class, measurable engineering problem.
 - **Persistent across restarts.** With `MEMORY_PERSIST_PATH` set, the store writes an
   atomic JSON snapshot on every change and reloads it on startup (rebuilding the vector
   index) — memories survive a full server restart, not just process lifetime.
-- **The dreaming loop (propose → approve).** An offline Qwen pass proposes
+- **The dreaming loop (propose → approve).** An out-of-band Qwen pass proposes
   consolidations (merge / forget / re-salience); a human approves, then only
   approved proposals are applied. It validates proposals against live record ids, so
   it won't act on its own hallucinations.
@@ -57,7 +57,7 @@ memory as a first-class, measurable engineering problem.
 A FastAPI backend on **Alibaba Cloud ECS** runs the agent loop, the dreaming loop, a
 FastMCP server, and the memory engine, backed by **Qdrant**. The agent and the
 dreaming loop both call **Qwen Cloud / DashScope** (reasoning model for the loop,
-`text-embedding` for vectors) over the OpenAI-compatible endpoint. The Qwen client
+`text-embedding-v3` for vectors) over the OpenAI-compatible endpoint. The Qwen client
 has bounded retry/backoff for resilience and meters token usage on every call. See
 `docs/architecture.png` for the rendered diagram.
 
@@ -84,7 +84,7 @@ lower is better) across a **shrinking token budget** (8/16/32/64), all systems
 competing under the same ceiling. Win condition: **B3 matches or beats B1/B2 on
 accuracy at every budget, with the lowest staleness.**
 
-**Graded run** (`uv run python -m benchmark.run`, deterministic + offline, zero spend);
+**Graded run** (`PYTHONPATH=src uv run --no-sync python -m benchmark.run`, deterministic + offline, zero spend);
 plot at `benchmark/results/context_efficiency.png`:
 
 | Budget | 8 | 16 | 32 | 64 |
@@ -99,7 +99,7 @@ the retired fact back in. Only B3 stays correct *and* small — measured, not as
 
 ### Built with
 Python · FastAPI · FastMCP · Qdrant · `openai` SDK → Qwen Cloud / DashScope
-(reasoning + `text-embedding`) · `tiktoken` (token-budget accounting) · pytest
+(reasoning + `text-embedding-v3`) · `tiktoken` (token-budget accounting) · pytest
 (fully offline test suite, zero-spend).
 
 ### Alibaba Cloud usage

@@ -45,7 +45,9 @@ def test_effective_salience_halves_at_exactly_one_half_life() -> None:
     default_typed = old_record("A passing note.", type="note", subject="misc", days_old=30)
 
     assert math.isclose(effective_salience(fact), fact.salience * 0.5, rel_tol=0.01)
-    assert math.isclose(effective_salience(default_typed), default_typed.salience * 0.5, rel_tol=0.01)
+    assert math.isclose(
+        effective_salience(default_typed), default_typed.salience * 0.5, rel_tol=0.01
+    )
 
 
 def test_retrieve_reinforces_packed_memory_and_resets_decay_clock() -> None:

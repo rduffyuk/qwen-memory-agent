@@ -7,7 +7,7 @@ preference" vs "morning beverage"), leaving stale records active. Pure Python +
 existing embeddings; no new deps.
 
 **Jira:** VW-1090 (use this key; do NOT create a new issue).
-**Repo:** this one (`~/qwen-memory-agent`, branch `main`). Public MIT repo.
+**Repo:** this one (`~/qwen-memory-agent`, current branch). Public MIT repo.
 
 ## Required Codex lane contract
 Follow the local AGENTS.md rules supplied by the runner. Use the VW-1090 key.
@@ -55,7 +55,7 @@ provenance/vault rules.
   box can be tuned via `.env` without a code change. Import `os` if needed. Do not change
   any route.
 
-## Acceptance — gate: `uv run pytest -q` (FULL suite, must pass, FULLY OFFLINE)
+## Acceptance — gate: `PYTHONPATH=src uv run --no-sync pytest -q tests/` (FULL suite, must pass, FULLY OFFLINE)
 Existing tests unchanged + NEW tests in `tests/test_engine.py` (use a fake embedder that
 returns caller-controlled vectors so cosines are deterministic):
 1. **Different-subject paraphrase is retired:** write A (subject "s1"), then B (subject

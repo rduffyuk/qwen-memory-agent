@@ -7,7 +7,7 @@ save on every mutation, load on startup, rebuild the in-memory index from it.
 Pure Python + stdlib; no new deps.
 
 **Jira:** VW-1090 (use this key; do NOT create a new issue).
-**Repo:** this one (`~/qwen-memory-agent`, branch `main`). Public MIT repo.
+**Repo:** this one (`~/qwen-memory-agent`, current branch). Public MIT repo.
 
 ## Required Codex lane contract
 Follow the local AGENTS.md rules supplied by the runner. Use the VW-1090 key. Do
@@ -49,7 +49,7 @@ unrelated refactors. Preserve provenance/vault rules.
   persistence via `.env` (e.g. `MEMORY_PERSIST_PATH=/root/qwen-memory-agent/memory.json`)
   with zero code change. `import os` already present. Change no route.
 
-## Acceptance — gate: `uv run pytest -q` (FULL suite, must pass, FULLY OFFLINE)
+## Acceptance — gate: `PYTHONPATH=src uv run --no-sync pytest -q tests/` (FULL suite, must pass, FULLY OFFLINE)
 Existing tests unchanged + NEW `tests/test_persistence.py`:
 1. **Round-trip survives a new store instance:** with `persist_path=tmp/x.json`, write two
    records into store A; construct a SEPARATE store B with the same path → B's

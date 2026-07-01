@@ -8,7 +8,7 @@ stale contradictions the write-time supersession path misses. Maps Track-1
 accurate decisions across sessions". Pure Python, no new deps.
 
 **Jira:** VW-1090 (use this key; do NOT create a new issue).
-**Repo:** this one (`~/qwen-memory-agent`, branch `main`). Public MIT repo — import nothing proprietary.
+**Repo:** this one (`~/qwen-memory-agent`, current branch). Public MIT repo — import nothing proprietary.
 
 ## Why (design rationale — keep this intent)
 `MemoryEngine.write()` retires a prior record only when a *new* fact is written
@@ -71,7 +71,7 @@ or assertion. Keep the ENTIRE current suite green.
 - Thread `prefer_type` through `mcp_server.py`'s `memory.recall` tool as an
   optional arg defaulting to `None`.
 
-## Acceptance — gate: `uv run pytest -q` (FULL suite, must pass, FULLY OFFLINE)
+## Acceptance — gate: `PYTHONPATH=src uv run --no-sync pytest -q tests/` (FULL suite, must pass, FULLY OFFLINE)
 New `tests/test_typed_retrieval.py` MUST cover (with a deterministic fake embedder
 returning equal vectors where a cosine tie is needed — no network):
 1. **Type prior breaks a cosine tie:** two records with identical embeddings but

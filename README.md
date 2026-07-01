@@ -16,7 +16,7 @@ measurable engineering problem, and every capability maps to a Track-1 requireme
 - **Budget-constrained recall** — retrieval scores memories by `α·cosine + β·recency + γ·effective_salience + δ·type_prior` and greedily packs them until a configurable token budget is hit, so context stays small *and* relevant.
 - **Portable memory (export / import)** — the whole store round-trips as JSON (vectors preserved, no re-embedding) or renders to Markdown, so memory moves *across sessions and machines.*
 - **Persistent across restarts** — set `MEMORY_PERSIST_PATH` and the store writes an atomic JSON snapshot on every change and reloads it on startup (rebuilding the vector index), so memories **survive a full server restart** — real persistence, not process-lifetime state.
-- **The dreaming loop (propose → approve)** — an offline Qwen pass reviews the store and *proposes* consolidations (merge / forget / re-salience); a human approves, then only approved proposals are applied. It validates every proposal against live record ids, so it refuses to act on its own hallucinations. *"Autonomously accumulate experience"* — with a human in the loop.
+- **The dreaming loop (propose → approve)** — an out-of-band Qwen pass reviews the store and *proposes* consolidations (merge / forget / re-salience); a human approves, then only approved proposals are applied. It validates every proposal against live record ids, so it refuses to act on its own hallucinations. *"Autonomously accumulate experience"* — with a human in the loop.
 - **Token & model observability** — every Qwen call's `usage` (prompt / completion / total tokens, per model) is accumulated and exposed at `/usage`; `/chat` reports the per-request token delta.
 - **A reproducible benchmark** — synthetic multi-session personas, a held-out query set, and baselines (no-memory / full-history / naive-RAG / ours), scored on recall accuracy, **staleness rate**, and a **context-efficiency curve**.
 
@@ -36,7 +36,7 @@ flowchart TB
         SNAP[("Disk snapshot<br/>memory.json · survives restart")]
     end
 
-    DS["Qwen Cloud / DashScope-intl<br/>reasoning model + text-embedding<br/>(usage metered per call)"]
+    DS["Qwen Cloud / DashScope-intl<br/>reasoning model + text-embedding-v3<br/>(usage metered per call)"]
 
     U -->|HTTP| API
     U -.->|MCP| MCP
@@ -66,19 +66,19 @@ The agent loop (`/chat`) lets Qwen choose tool calls; the same memory engine is 
 
 ## Stack
 
-Python · FastAPI · **Qwen function-calling agent loop** · FastMCP · `openai` SDK → DashScope-intl · Qwen text-embedding · Qdrant · `tiktoken` (budget accounting).
+Python · FastAPI · **Qwen function-calling agent loop** · FastMCP · `openai` SDK → DashScope-intl · Qwen `text-embedding-v3` · Qdrant · `tiktoken` (budget accounting).
 
 ## Quickstart
 
 ```bash
 uv sync
 cp .env.example .env   # set DASHSCOPE_API_KEY + DASHSCOPE_BASE_URL
-uv run pytest -q       # tests run fully mocked — zero Qwen credit spend
+PYTHONPATH=src uv run --no-sync pytest -q tests/  # fully mocked — zero Qwen credit spend
 ```
 
 ## Benchmark results
 
-Reproducible and **fully offline** — `uv run python -m benchmark.run` uses a deterministic
+Reproducible and **fully offline** — `PYTHONPATH=src uv run --no-sync python -m benchmark.run` uses a deterministic
 bag-of-vocabulary embedder, so the harness measures the *memory engine's* ranking +
 supersession logic (not embedding noise) and costs **zero Qwen credits**. All three systems
 compete under the **same shrinking token budget**, so this is a fair context-efficiency test.

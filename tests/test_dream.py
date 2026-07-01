@@ -49,6 +49,15 @@ def make_engine(replies: list[str] | None = None) -> MemoryEngine:
     )
 
 
+def test_dream_empty_store_returns_empty_without_qwen_call() -> None:
+    engine = make_engine()
+
+    proposals = DreamLoop(engine).dream()
+
+    assert proposals == []
+    assert engine.qwen.chat_calls == 0
+
+
 def test_dream_parses_proposals_without_mutating_store() -> None:
     engine = make_engine()
     first = engine.write("Ryan prefers coffee.", type="preference", subject="drink")

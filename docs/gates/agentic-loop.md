@@ -1,7 +1,7 @@
 # Gate spec — agentic memory loop + Qwen hardening (VW-1090)
 
 **Jira:** VW-1090 (use this key; do not create a new issue).
-**Repo:** this one (`~/qwen-memory-agent`, branch `main`). Fresh MIT public repo — import nothing proprietary.
+**Repo:** this one (`~/qwen-memory-agent`, current branch). Fresh MIT public repo — import nothing proprietary.
 **Why:** judges reward "sophisticated use of QwenCloud APIs (MCP integrations)" + "error handling". Today `/chat` always retrieves — make the agent itself decide, via Qwen function-calling, when to remember/recall/forget. Keep everything offline-testable (zero Qwen spend).
 
 ## Goal
@@ -18,7 +18,7 @@ Add a Qwen function-calling **agent loop** so the model autonomously invokes the
 - `src/memory_agent/api.py` — `/chat` uses `MemoryAgent(engine).run(...)`; response includes `answer`, `tool_calls_made`, `memories`. Keep `/health`.
 - `tests/test_agent.py` (new) + update `tests/test_api.py` if signature changes.
 
-## Acceptance — gate: `uv run pytest -q tests/` (must pass, FULLY OFFLINE)
+## Acceptance — gate: `PYTHONPATH=src uv run --no-sync pytest -q tests/` (must pass, FULLY OFFLINE)
 New tests MUST cover (with a scripted FakeQwen that returns tool_calls then a final answer — no network):
 1. agent executes a model-requested `recall` then returns the model's final answer; `tool_calls_made` includes "recall".
 2. agent executes a model-requested `remember` and the fact is persisted (engine.store has it afterward).

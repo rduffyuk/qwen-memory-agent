@@ -46,7 +46,7 @@ green. No unrelated refactors.
    decayed_below`. Combine with existing ttl/salience/subject filters (OR
    semantics, consistent with current behaviour).
 
-## Acceptance criteria (gate: `uv run pytest -q` — ALL pass)
+## Acceptance criteria (gate: `PYTHONPATH=src uv run --no-sync pytest -q tests/` — ALL pass)
 
 1. A non-pinned (`type="fact"`) record aged past its half-life has strictly
    lower `effective_salience` than its raw `salience`; a `type="preference"`

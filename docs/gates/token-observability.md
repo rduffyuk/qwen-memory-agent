@@ -41,7 +41,7 @@ assertion. Keep all current tests green. No unrelated refactors. The
      the difference (`prompt_tokens`, `completion_tokens`, `total_tokens`, `calls`).
      If the client has no `usage_summary`, return zeros.
 
-## Acceptance criteria (gate: `uv run pytest -q` — ALL pass)
+## Acceptance criteria (gate: `PYTHONPATH=src uv run --no-sync pytest -q tests/` — ALL pass)
 
 Use a fake OpenAI-compatible client (has `.chat.completions.create` /
 `.embeddings.create` returning objects that carry `.usage` + `.model`) injected
