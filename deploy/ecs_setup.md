@@ -56,8 +56,17 @@ uv sync                        # pick up any dependency changes
 # restart the server: Ctrl-C the tmux/foreground process, or if it's a systemd unit:
 sudo systemctl restart qwen-memory-agent
 ```
-Confirm the new surface is live: `curl http://<ECS_PUBLIC_IP>:8000/dream` should return
-`200` (older builds without the dreaming loop return `404`).
+**Restarting is required, not optional** — `git pull` only updates files on disk; the
+already-running server keeps serving the OLD code until its process is restarted (a
+`404`/`405` on a route you just added is the tell). If `uvicorn` prints
+`address already in use`, an old instance still holds the port:
+```bash
+pkill -f "uvicorn memory_agent.api"      # stop the stale server
+ss -ltnp | grep :8000                    # confirm the port is free (prints nothing)
+```
+Confirm the new surface is live: `curl -X POST http://<ECS_PUBLIC_IP>:8000/dream`
+should return `200` with a `proposals` list (older builds without the dreaming loop
+return `404`; a `405 Method Not Allowed` means you sent a GET — `/dream` is POST-only).
 
 ## 3. Smoke-test it's live (and show off the memory engine)
 From your laptop (replace with the ECS public IP). This sequence is also a good
@@ -83,7 +92,7 @@ curl -s http://$IP:8000/usage
 curl -s http://$IP:8000/memory/export
 
 # 5. the dreaming loop: propose consolidations, then apply only what you approve
-curl -s http://$IP:8000/dream                    # -> {"proposals":[{ "id": ..., "kind": ... }]}
+curl -sX POST http://$IP:8000/dream              # POST (not GET) -> {"proposals":[{ "id": ..., "kind": ... }]}
 # review the proposals, then apply the approved ids:
 curl -sX POST http://$IP:8000/dream/apply -H 'content-type: application/json' \
   -d '{"proposals":[<paste proposals from /dream>],"approved_ids":["<id-to-approve>"]}'
