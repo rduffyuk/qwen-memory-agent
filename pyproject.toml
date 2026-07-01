@@ -39,6 +39,12 @@ packages = ["src/memory_agent"]
 testpaths = ["tests"]
 addopts = "-q"
 pythonpath = [".", "src"]
+filterwarnings = [
+    # Cosmetic: FastAPI's TestClient still imports httpx via starlette; upstream
+    # deprecation, nothing in our code to change. Targeted (message-matched) so we
+    # don't hide any other warning.
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+]
 
 [tool.isort]
 profile = "black"
