@@ -27,10 +27,14 @@ def create_mcp_server(engine: MemoryEngine) -> FastMCP:
         ).model_dump(mode="json")
 
     @mcp.tool(name="memory.recall")
-    def recall(query: str, token_budget: int | None = None) -> list[dict[str, Any]]:
+    def recall(
+        query: str,
+        token_budget: int | None = None,
+        prefer_type: str | None = None,
+    ) -> list[dict[str, Any]]:
         return [
             record.model_dump(mode="json")
-            for record in engine.retrieve(query, token_budget=token_budget)
+            for record in engine.retrieve(query, token_budget=token_budget, prefer_type=prefer_type)
         ]
 
     @mcp.tool(name="memory.forget")

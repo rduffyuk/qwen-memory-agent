@@ -11,6 +11,15 @@ from memory_agent.store import MemoryStore, SearchResult
 DECAY_HALF_LIVES = {"fact": 30.0, "episodic": 7.0}
 DEFAULT_HALF_LIFE_DAYS = 30.0
 PINNED_TYPES = {"preference"}
+TYPE_PRIORS = {
+    "identity": 1.0,
+    "preference": 1.0,
+    "decision": 1.0,
+    "fact": 0.8,
+    "episodic": 0.5,
+    "chore": 0.3,
+}
+DEFAULT_TYPE_PRIOR = 0.7
 
 
 class MemoryEngine:
@@ -23,6 +32,7 @@ class MemoryEngine:
         alpha: float = 0.70,
         beta: float = 0.15,
         gamma: float = 0.15,
+        delta: float = 0.10,
     ) -> None:
         self.qwen = qwen
         self.store = store or MemoryStore(location=":memory:")
@@ -30,6 +40,7 @@ class MemoryEngine:
         self.alpha = alpha
         self.beta = beta
         self.gamma = gamma
+        self.delta = delta
         self._encoding = _load_encoding()
 
     def write(
@@ -61,15 +72,21 @@ class MemoryEngine:
         *,
         token_budget: int | None = None,
         limit: int = 50,
+        prefer_type: str | None = None,
     ) -> list[MemoryRecord]:
         budget = token_budget if token_budget is not None else self.token_budget
         query_vector = self.qwen.embed(query)
         candidates = self.store.search(query_vector, limit=limit)
-        ranked = sorted(candidates, key=self._hybrid_score, reverse=True)
+        ranked = sorted(
+            candidates,
+            key=lambda result: self._hybrid_score(result, prefer_type=prefer_type),
+            reverse=True,
+        )
+        current = self._veto_stale_siblings(ranked)
 
         packed: list[MemoryRecord] = []
         used = 0
-        for result in ranked:
+        for result in current:
             cost = self.count_tokens(result.record.text)
             separator_cost = 1 if packed else 0
             if used + separator_cost + cost > budget:
@@ -153,12 +170,29 @@ class MemoryEngine:
             return 0
         return len(self._encoding.encode(text))
 
-    def _hybrid_score(self, result: SearchResult) -> float:
-        return (
+    def _hybrid_score(self, result: SearchResult, *, prefer_type: str | None = None) -> float:
+        score = (
             self.alpha * result.cosine
             + self.beta * _recency_score(result.record)
             + self.gamma * effective_salience(result.record)
+            + self.delta * type_prior(result.record)
         )
+        if prefer_type is not None and result.record.type == prefer_type:
+            score += self.delta
+        return score
+
+    def _veto_stale_siblings(self, ranked: list[SearchResult]) -> list[SearchResult]:
+        selected: dict[tuple[str, str], SearchResult] = {}
+        for result in ranked:
+            key = (result.record.subject, result.record.type)
+            current = selected.get(key)
+            if current is None or result.record.ts > current.record.ts:
+                selected[key] = result
+        return [
+            result
+            for result in ranked
+            if selected[(result.record.subject, result.record.type)] is result
+        ]
 
     def _reinforce(self, records: list[MemoryRecord]) -> list[MemoryRecord]:
         now = datetime.now(timezone.utc)
@@ -182,6 +216,10 @@ def effective_salience(record: MemoryRecord) -> float:
     half_life_days = DECAY_HALF_LIVES.get(record.type, DEFAULT_HALF_LIFE_DAYS)
     factor = 0.5 ** (age_days / half_life_days)
     return record.salience * factor
+
+
+def type_prior(record: MemoryRecord) -> float:
+    return TYPE_PRIORS.get(record.type, DEFAULT_TYPE_PRIOR)
 
 
 def _recency_score(record: MemoryRecord) -> float:
