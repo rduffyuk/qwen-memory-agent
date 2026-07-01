@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import os
 from dataclasses import dataclass
 
 import numpy as np
@@ -22,12 +24,20 @@ class MemoryStore:
         collection_name: str = "memory_agent",
         client: QdrantClient | None = None,
         location: str | None = None,
+        persist_path: str | None = None,
     ) -> None:
         self.collection_name = collection_name
         self.client = client or QdrantClient(location=location or ":memory:")
+        self.persist_path = persist_path
         self._records: dict[str, MemoryRecord] = {}
         self._vectors: dict[str, list[float]] = {}
         self._vector_size: int | None = None
+        if (
+            self.persist_path
+            and os.path.exists(self.persist_path)
+            and os.path.getsize(self.persist_path)
+        ):
+            self._load()
 
     def upsert(self, record: MemoryRecord, vector: list[float]) -> MemoryRecord:
         self._ensure_collection(len(vector))
@@ -43,6 +53,7 @@ class MemoryStore:
                 )
             ],
         )
+        self._save()
         return record
 
     def search(
@@ -69,6 +80,7 @@ class MemoryStore:
                 collection_name=self.collection_name,
                 points_selector=PointIdsList(points=[record_id]),
             )
+        self._save()
         return existed
 
     def mark_superseded(self, record_id: str, superseded_by: str) -> MemoryRecord | None:
@@ -82,6 +94,7 @@ class MemoryStore:
             payload={"superseded_by": superseded_by},
             points=[record_id],
         )
+        self._save()
         return updated
 
     def get(self, record_id: str) -> MemoryRecord | None:
@@ -143,6 +156,54 @@ class MemoryStore:
                 vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
             )
         self._vector_size = vector_size
+
+    def _snapshot(self) -> dict[str, object]:
+        return {
+            "version": 1,
+            "records": [
+                {
+                    "record": record.model_dump(mode="json"),
+                    "vector": self._vectors[record.id],
+                }
+                for record in self._records.values()
+            ],
+        }
+
+    def _save(self) -> None:
+        if self.persist_path is None:
+            return
+        tmp_path = self.persist_path + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as file:
+            json.dump(self._snapshot(), file)
+        os.replace(tmp_path, self.persist_path)
+
+    def _load(self) -> None:
+        if self.persist_path is None or not os.path.exists(self.persist_path):
+            return
+        try:
+            with open(self.persist_path, encoding="utf-8") as file:
+                data = json.load(file)
+            entries = data["records"]
+            if not isinstance(entries, list):
+                raise ValueError("records must be a list")
+            for entry in entries:
+                record = MemoryRecord.model_validate(entry["record"])
+                vector = list(entry["vector"])
+                self._ensure_collection(len(vector))
+                self._records[record.id] = record
+                self._vectors[record.id] = vector
+                self.client.upsert(
+                    collection_name=self.collection_name,
+                    points=[
+                        PointStruct(
+                            id=record.id,
+                            vector=vector,
+                            payload=record.model_dump(mode="json"),
+                        )
+                    ],
+                )
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+            raise ValueError(f"failed to load memory snapshot from {self.persist_path}") from exc
 
 
 def _cosine(left: list[float], right: list[float]) -> float:

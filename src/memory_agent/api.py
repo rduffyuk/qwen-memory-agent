@@ -107,7 +107,7 @@ def create_app(engine: MemoryEngine | None = None) -> FastAPI:
     app = FastAPI(title="qwen-memory-agent")
     resolved_engine = engine or MemoryEngine(
         qwen=LazyQwenClient(),
-        store=MemoryStore(),
+        store=MemoryStore(persist_path=os.getenv("MEMORY_PERSIST_PATH") or None),
         supersede_threshold=float(os.getenv("SUPERSEDE_THRESHOLD", "0.9")),
     )
     app.state.engine = resolved_engine
