@@ -48,6 +48,7 @@ class QwenClient:
         self.embed_model = embed_model
         self.max_retries = max(1, max_retries)
         self.backoff_base = max(0.0, backoff_base)
+        self._usage = _zero_usage_summary()
         if client is not None:
             self.client = client
             return
@@ -78,6 +79,7 @@ class QwenClient:
         response = self._with_retries(
             lambda: self.client.chat.completions.create(**request),
         )
+        self._record_usage(response, request["model"])
         turn = _normalize_chat_turn(response.choices[0].message)
         if tools is None:
             return turn.content or ""
@@ -90,7 +92,51 @@ class QwenClient:
                 input=[text],
             )
         )
+        self._record_usage(response, self.embed_model)
         return list(response.data[0].embedding)
+
+    def usage_summary(self) -> dict[str, Any]:
+        return {
+            "total_calls": self._usage["total_calls"],
+            "prompt_tokens": self._usage["prompt_tokens"],
+            "completion_tokens": self._usage["completion_tokens"],
+            "total_tokens": self._usage["total_tokens"],
+            "by_model": {model: values.copy() for model, values in self._usage["by_model"].items()},
+        }
+
+    def _record_usage(self, response: Any, model: str) -> None:
+        usage = getattr(response, "usage", None)
+        if usage is None:
+            return
+
+        prompt_tokens = int(_get_attr_or_key(usage, "prompt_tokens") or 0)
+        completion_tokens = int(_get_attr_or_key(usage, "completion_tokens") or 0)
+        raw_total_tokens = _get_attr_or_key(usage, "total_tokens")
+        total_tokens = (
+            int(raw_total_tokens)
+            if raw_total_tokens is not None
+            else prompt_tokens + completion_tokens
+        )
+        response_model = str(getattr(response, "model", None) or model)
+
+        self._usage["total_calls"] += 1
+        self._usage["prompt_tokens"] += prompt_tokens
+        self._usage["completion_tokens"] += completion_tokens
+        self._usage["total_tokens"] += total_tokens
+
+        by_model = self._usage["by_model"].setdefault(
+            response_model,
+            {
+                "calls": 0,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
+            },
+        )
+        by_model["calls"] += 1
+        by_model["prompt_tokens"] += prompt_tokens
+        by_model["completion_tokens"] += completion_tokens
+        by_model["total_tokens"] += total_tokens
 
     def _with_retries(self, call: Any) -> Any:
         for attempt in range(self.max_retries):
@@ -105,6 +151,16 @@ class QwenClient:
                 if delay > 0:
                     time.sleep(delay)
         raise RuntimeError("retry loop exhausted unexpectedly")
+
+
+def _zero_usage_summary() -> dict[str, Any]:
+    return {
+        "total_calls": 0,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0,
+        "by_model": {},
+    }
 
 
 def _normalize_chat_turn(message: Any) -> ChatTurn:
