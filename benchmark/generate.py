@@ -36,3 +36,29 @@ def synthetic_personas() -> list[dict[str, Any]]:
             ],
         }
     ]
+
+
+def capability_cases() -> dict[str, list[dict[str, Any]]]:
+    return {
+        "abstention": [
+            {
+                "id": "weather",
+                "query": "What is today's weather forecast?",
+                "must_not_contain": ["coffee", "tea", "jazz", "python", "soda", "ruby"],
+            }
+        ],
+        "temporal": [
+            {
+                "id": "morning_drink_present",
+                "query": "What does Ryan drink in the morning now?",
+                "expected": "tea",
+                "stale": ["coffee"],
+            },
+            {
+                "id": "morning_drink_past",
+                "query": "What did Ryan drink in the morning before he switched?",
+                "subject": "morning_drink",
+                "expected": "coffee",
+            },
+        ],
+    }

@@ -13,8 +13,8 @@ from benchmark.baselines import (
     b3_ours,
     build_history,
 )
-from benchmark.generate import synthetic_personas
-from benchmark.score import score_predictions
+from benchmark.generate import capability_cases, synthetic_personas
+from benchmark.score import score_abstention, score_predictions, score_temporal
 from memory_agent.engine import MemoryEngine
 from memory_agent.store import MemoryStore
 
@@ -25,9 +25,29 @@ BUDGETS = [8, 16, 32, 64]
 # A tiny topical vocabulary shared by memories AND queries, so the fake embedder
 # ranks by shared concepts rather than collapsing queries to a zero vector.
 _VOCAB = [
-    "ryan", "sam", "maya", "morning", "drink", "coffee", "tea", "soda", "lunch",
-    "music", "jazz", "coding", "language", "python", "ruby", "prototypes",
-    "prefers", "prefer", "uses", "use", "likes", "writes", "tests",
+    "ryan",
+    "sam",
+    "maya",
+    "morning",
+    "drink",
+    "coffee",
+    "tea",
+    "soda",
+    "lunch",
+    "music",
+    "jazz",
+    "coding",
+    "language",
+    "python",
+    "ruby",
+    "prototypes",
+    "prefers",
+    "prefer",
+    "uses",
+    "use",
+    "likes",
+    "writes",
+    "tests",
 ]
 
 
@@ -56,6 +76,8 @@ def run(results_dir: Path = Path("benchmark/results")) -> dict[str, Any]:
         for name in ("B0", "B1", "B2", "B3"):
             predictions, fixtures = _evaluate(name, personas, budget=budget)
             output["baselines"][name][str(budget)] = score_predictions(predictions, fixtures)
+
+    output["capabilities"] = _evaluate_capabilities(personas)
 
     destination = results_dir / "latest.json"
     destination.write_text(json.dumps(output, indent=2, sort_keys=True), encoding="utf-8")
@@ -88,6 +110,55 @@ def _build_engine(history: list[dict[str, str]], *, budget: int) -> MemoryEngine
     for item in history:
         engine.write(item["text"], type="preference", subject=item["subject"])
     return engine
+
+
+def _evaluate_capabilities(personas: list[dict[str, Any]]) -> dict[str, Any]:
+    budget = 64
+    history = build_history(personas[0])
+    cases = capability_cases()
+    abstention = cases["abstention"]
+    engine = _build_engine(history, budget=budget)
+
+    abstention_predictions = {
+        "B1": {
+            case["id"]: b1_full_history(case["query"], history, token_budget=budget)
+            for case in abstention
+        },
+        "B2": {
+            case["id"]: b2_naive_top_k(case["query"], history, token_budget=budget)
+            for case in abstention
+        },
+        "B3": {
+            case["id"]: "\n".join(
+                record.text
+                for record in engine.retrieve(
+                    case["query"],
+                    token_budget=budget,
+                    min_relevance=0.05,
+                )
+            )
+            for case in abstention
+        },
+    }
+
+    present_case, past_case = cases["temporal"]
+    present_pred = "\n".join(
+        record.text for record in engine.retrieve(present_case["query"], token_budget=budget)
+    )
+    past_pred = "\n".join(record.text for record in engine.history(past_case["subject"]))
+
+    return {
+        "abstention": {
+            name: score_abstention(predictions, abstention)
+            for name, predictions in abstention_predictions.items()
+        },
+        # B1 full history keeps every fact and can answer historical questions at
+        # full token cost. This is a B3 present/past separation score, not a
+        # claim that B3 beats B1 on historical recall.
+        "temporal": {
+            "B3": score_temporal(present_pred, past_pred, present_case, past_case),
+        },
+    }
 
 
 def _predict(

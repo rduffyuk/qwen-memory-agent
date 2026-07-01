@@ -75,3 +75,39 @@ def test_retrieve_ranks_relevant_memory_above_distractor() -> None:
     assert recalled
     assert recalled[0].subject == "drink"
     assert "coffee" in recalled[0].text
+
+
+def test_retrieve_min_relevance_can_filter_unrelated_zero_overlap_query() -> None:
+    engine = make_engine()
+    engine.write("Ryan likes jazz while coding.", type="preference", subject="music")
+
+    default_recalled = engine.retrieve("weather forecast", token_budget=128)
+    filtered_recalled = engine.retrieve("weather forecast", token_budget=128, min_relevance=0.05)
+
+    assert default_recalled
+    assert filtered_recalled == []
+
+
+def test_history_returns_superseded_records_newest_retired_first() -> None:
+    engine = make_engine()
+    first = engine.write(
+        "Ryan prefers coffee in the morning.",
+        type="preference",
+        subject="morning_drink",
+    )
+    second = engine.write(
+        "Ryan prefers tea in the morning.",
+        type="preference",
+        subject="morning_drink",
+    )
+    active = engine.write(
+        "Ryan prefers water in the morning.",
+        type="preference",
+        subject="morning_drink",
+    )
+
+    retired = engine.history("morning_drink")
+
+    assert [record.id for record in retired] == [second.id, first.id]
+    assert active.id not in {record.id for record in retired}
+    assert all(record.superseded_by is not None for record in retired)

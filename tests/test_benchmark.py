@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import json
 
-from benchmark.baselines import b0_no_memory, b1_full_history, b2_naive_top_k, build_history
+from benchmark.baselines import (
+    b0_no_memory,
+    b1_full_history,
+    b2_naive_top_k,
+    build_history,
+)
 from benchmark.generate import synthetic_personas
 from benchmark.run import BUDGETS, run
 from benchmark.score import score_predictions
@@ -32,9 +37,7 @@ def test_b1_full_history_packs_in_chronological_order_within_budget() -> None:
 
 def test_b2_ranks_by_overlap_then_packs_to_budget() -> None:
     history = _history()
-    top = b2_naive_top_k(
-        "What language does Ryan use for prototypes?", history, token_budget=8
-    )
+    top = b2_naive_top_k("What language does Ryan use for prototypes?", history, token_budget=8)
     assert top == "Ryan uses Python for prototypes."
 
 
@@ -57,6 +60,27 @@ def test_run_end_to_end_structure(tmp_path) -> None:
         assert set(results["baselines"][name]) == {str(b) for b in BUDGETS}
 
 
+def test_run_includes_capability_scores(tmp_path) -> None:
+    results = run(results_dir=tmp_path / "out")
+
+    assert set(results["capabilities"]) == {"abstention", "temporal"}
+    assert set(results["capabilities"]["abstention"]) == {"B1", "B2", "B3"}
+    assert set(results["capabilities"]["temporal"]) == {"B3"}
+
+
+def test_capability_abstention_rewards_relevance_floor(tmp_path) -> None:
+    abstention = run(results_dir=tmp_path / "out")["capabilities"]["abstention"]
+
+    assert abstention["B3"]["abstention_accuracy"] == 1.0
+    assert any(abstention[name]["abstention_accuracy"] < 1.0 for name in ("B1", "B2"))
+
+
+def test_capability_temporal_scores_b3_present_past_separation(tmp_path) -> None:
+    temporal = run(results_dir=tmp_path / "out")["capabilities"]["temporal"]
+
+    assert temporal["B3"]["temporal_accuracy"] == 1.0
+
+
 def test_b3_dominates_recall_and_staleness_at_every_budget(tmp_path) -> None:
     # ours is the only system with perfect recall AND zero staleness at every
     # budget, and is never beaten by a naive baseline on either axis.
@@ -65,12 +89,14 @@ def test_b3_dominates_recall_and_staleness_at_every_budget(tmp_path) -> None:
         assert baselines["B3"][budget]["recall_accuracy"] == 1.0
         assert baselines["B3"][budget]["staleness_rate"] == 0.0
         for naive in ("B1", "B2"):
-            assert baselines["B3"][budget]["recall_accuracy"] >= baselines[naive][budget][
-                "recall_accuracy"
-            ]
-            assert baselines["B3"][budget]["staleness_rate"] <= baselines[naive][budget][
-                "staleness_rate"
-            ]
+            assert (
+                baselines["B3"][budget]["recall_accuracy"]
+                >= baselines[naive][budget]["recall_accuracy"]
+            )
+            assert (
+                baselines["B3"][budget]["staleness_rate"]
+                <= baselines[naive][budget]["staleness_rate"]
+            )
 
 
 def test_naive_top_k_gets_staler_as_budget_grows(tmp_path) -> None:

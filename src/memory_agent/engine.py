@@ -73,6 +73,7 @@ class MemoryEngine:
         token_budget: int | None = None,
         limit: int = 50,
         prefer_type: str | None = None,
+        min_relevance: float = 0.0,
     ) -> list[MemoryRecord]:
         budget = token_budget if token_budget is not None else self.token_budget
         query_vector = self.qwen.embed(query)
@@ -82,6 +83,7 @@ class MemoryEngine:
             key=lambda result: self._hybrid_score(result, prefer_type=prefer_type),
             reverse=True,
         )
+        ranked = [result for result in ranked if result.cosine >= min_relevance]
         current = self._veto_stale_siblings(ranked)
 
         packed: list[MemoryRecord] = []
@@ -94,6 +96,16 @@ class MemoryEngine:
             packed.append(result.record)
             used += separator_cost + cost
         return self._reinforce(packed)
+
+    def history(self, subject: str, *, type: str | None = None) -> list[MemoryRecord]:
+        records = [
+            record
+            for record in self.store.list_records(include_superseded=True)
+            if record.subject == subject
+            and record.superseded_by is not None
+            and (type is None or record.type == type)
+        ]
+        return sorted(records, key=lambda record: record.ts, reverse=True)
 
     def forget(
         self,
