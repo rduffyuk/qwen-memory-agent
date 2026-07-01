@@ -1,8 +1,8 @@
-"""Render the benchmark's context-efficiency curve to a PNG for the README / demo.
+"""Render the benchmark's context-efficiency curves to a PNG for the README / demo.
 
-Reads the JSON written by ``benchmark.run.run`` and plots B3 (ours) accuracy and
-staleness across token budgets, with B1 (full-history) and B2 (naive top-k) as
-reference lines. Run AFTER a live benchmark:
+Reads the JSON written by ``benchmark.run.run`` and plots recall accuracy and
+staleness rate vs token budget for B1 (full-history), B2 (naive top-k) and B3
+(ours). Run AFTER a benchmark run:
 
     uv run --extra viz python -m benchmark.plot
 
@@ -18,6 +18,12 @@ from typing import Any
 
 RESULTS = Path("benchmark/results/latest.json")
 OUT = Path("benchmark/results/context_efficiency.png")
+
+_SERIES = {
+    "B1": ("B1 full-history", "#c0392b"),
+    "B2": ("B2 naive top-k", "#e67e22"),
+    "B3": ("B3 ours", "#27ae60"),
+}
 
 
 def plot(results_path: Path = RESULTS, out_path: Path = OUT) -> Path:
@@ -35,30 +41,34 @@ def plot(results_path: Path = RESULTS, out_path: Path = OUT) -> Path:
     budgets: list[int] = data["budgets"]
     baselines = data["baselines"]
 
-    b3 = baselines["B3"]
-    b3_recall = [b3[str(b)]["recall_accuracy"] for b in budgets]
-    b3_stale = [b3[str(b)]["staleness_rate"] for b in budgets]
+    fig, (ax_r, ax_s) = plt.subplots(1, 2, figsize=(11, 4.4))
 
-    fig, ax = plt.subplots(figsize=(7, 4.5))
-    ax.plot(budgets, b3_recall, marker="o", label="B3 ours — recall accuracy")
-    ax.plot(budgets, b3_stale, marker="o", linestyle="--", label="B3 ours — staleness rate")
+    for key, (label, color) in _SERIES.items():
+        series = baselines[key]
+        recall = [series[str(b)]["recall_accuracy"] for b in budgets]
+        stale = [series[str(b)]["staleness_rate"] for b in budgets]
+        ax_r.plot(budgets, recall, marker="o", color=color, label=label)
+        ax_s.plot(budgets, stale, marker="o", color=color, label=label)
 
-    # reference lines for the stateless baselines (budget-independent)
-    for name, style in (("B1", ":"), ("B2", "-.")):
-        if name in baselines and "recall_accuracy" in baselines[name]:
-            ax.axhline(
-                baselines[name]["recall_accuracy"],
-                linestyle=style,
-                alpha=0.6,
-                label=f"{name} recall (no budget control)",
-            )
+    for ax, title, ylabel in (
+        (ax_r, "Recall accuracy vs budget  (higher is better)", "recall accuracy"),
+        (ax_s, "Staleness rate vs budget  (lower is better)", "staleness rate"),
+    ):
+        ax.set_xlabel("memory token budget")
+        ax.set_ylabel(ylabel)
+        ax.set_xticks(budgets)
+        ax.set_ylim(-0.05, 1.05)
+        ax.set_title(title, fontsize=10)
+        ax.grid(True, alpha=0.25)
+        ax.legend(fontsize=8, loc="center right")
 
-    ax.set_xlabel("memory token budget")
-    ax.set_ylabel("rate")
-    ax.set_ylim(-0.02, 1.02)
-    ax.set_title("Context-efficiency: accuracy & staleness vs token budget")
-    ax.legend(fontsize=8)
-    fig.tight_layout()
+    fig.suptitle(
+        "Qwen MemoryAgent — context efficiency: B3 holds recall 1.0 / staleness 0.0 "
+        "at every budget",
+        fontsize=11,
+        fontweight="bold",
+    )
+    fig.tight_layout(rect=(0, 0, 1, 0.95))
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=140)
     return out_path

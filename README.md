@@ -56,22 +56,33 @@ uv run pytest -q       # tests run fully mocked — zero Qwen credit spend
 ## Benchmark results
 
 Reproducible and **fully offline** — `uv run python -m benchmark.run` uses a deterministic
-keyword embedder, so the harness measures the *memory engine's* ranking + supersession logic
-(not embedding noise) and costs **zero Qwen credits**.
+bag-of-vocabulary embedder, so the harness measures the *memory engine's* ranking +
+supersession logic (not embedding noise) and costs **zero Qwen credits**. All three systems
+compete under the **same shrinking token budget**, so this is a fair context-efficiency test.
 
-| System | Recall accuracy | Staleness rate |
-|--------|:--------------:|:--------------:|
-| B0 — no memory | 0.00 | 0.00 |
-| B1 — full-history stuffing | 1.00 | 0.50 |
-| B2 — naive top-k RAG | 1.00 | 0.50 |
-| **B3 — ours (supersession + budget)** | **1.00** | **0.00** |
+![Context-efficiency curves](benchmark/results/context_efficiency.png)
 
-**B3 is the only system that recalls the current preference (1.00) _and_ never surfaces a
-superseded one (0.00 staleness).** B1 and B2 match on recall but re-surface the retired
-"coffee" preference on half the queries — because neither has a notion of "this fact was
-replaced." Staleness = fraction of queries whose answer contained a retired fact (lower is
-better), over the synthetic multi-session persona set in `benchmark/generate.py`.
-Supersession-aware forgetting is what separates B3.
+Recall accuracy and staleness rate (fraction of answers containing a *retired* fact; lower is
+better) vs the memory token budget, over the synthetic multi-session persona set in
+`benchmark/generate.py`:
+
+| Budget (tokens) | 8 | 16 | 32 | 64 |
+|---|:--:|:--:|:--:|:--:|
+| B1 full-history — recall / staleness | 0.00 / 0.50 | 0.00 / 0.50 | 1.00 / 0.50 | 1.00 / 0.50 |
+| B2 naive top-k — recall / staleness | 0.50 / 0.00 | 1.00 / 0.00 | 1.00 / **0.50** | 1.00 / **0.50** |
+| **B3 ours — recall / staleness** | **1.00 / 0.00** | **1.00 / 0.00** | **1.00 / 0.00** | **1.00 / 0.00** |
+
+**B3 holds recall 1.00 and staleness 0.00 at every budget** — it's the only system that recalls
+the current preference *and* never re-surfaces the retired one. Two things the naive baselines
+can't do:
+
+- **B1** (dump history chronologically) wastes its budget on the oldest facts, so it needs a
+  large budget just to recall the current answer — and it permanently carries the stale one.
+- **B2** (keyword top-k) *gets staler as the budget grows*: with no notion of "replaced," extra
+  budget pulls the retired "coffee" fact back in, so its staleness climbs 0.00 → 0.50.
+
+Only **supersession-aware forgetting + budget-constrained recall** keeps the working set both
+correct and small.
 
 ## License
 

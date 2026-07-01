@@ -56,22 +56,23 @@ Synthetic multi-session personas state preferences, **update** some (the
 supersession test), and inject distractors; a held-out query set asks for the
 *current* preference. We score four systems — **B0** no-memory, **B1**
 full-history-stuffing, **B2** naive top-k RAG, **B3** ours (salience + recency +
-supersession) — on recall accuracy, **staleness rate** (using a superseded fact —
-lower is better), and a **context-efficiency curve** (accuracy at 512/1k/2k-token
-budgets). Win condition: **B3 matches or beats B1/B2 on accuracy at a fixed small
-budget, with the lowest staleness.**
+supersession) — on recall accuracy and **staleness rate** (using a superseded fact —
+lower is better) across a **shrinking token budget** (8/16/32/64), all systems
+competing under the same ceiling. Win condition: **B3 matches or beats B1/B2 on
+accuracy at every budget, with the lowest staleness.**
 
-**Graded run** (`uv run python -m benchmark.run`, deterministic + offline, zero spend):
+**Graded run** (`uv run python -m benchmark.run`, deterministic + offline, zero spend);
+plot at `benchmark/results/context_efficiency.png`:
 
-| System | Recall | Staleness |
-|--------|:------:|:---------:|
-| B0 no-memory | 0.00 | 0.00 |
-| B1 full-history | 1.00 | 0.50 |
-| B2 naive top-k | 1.00 | 0.50 |
-| **B3 ours** | **1.00** | **0.00** |
+| Budget | 8 | 16 | 32 | 64 |
+|---|:--:|:--:|:--:|:--:|
+| B1 full-history — recall / stale | 0.00 / 0.50 | 0.00 / 0.50 | 1.00 / 0.50 | 1.00 / 0.50 |
+| B2 naive top-k — recall / stale | 0.50 / 0.00 | 1.00 / 0.00 | 1.00 / 0.50 | 1.00 / 0.50 |
+| **B3 ours — recall / stale** | **1.00 / 0.00** | **1.00 / 0.00** | **1.00 / 0.00** | **1.00 / 0.00** |
 
-B3 is the only system that recalls the current preference *and* never re-surfaces a
-superseded one — the supersession win, measured rather than asserted.
+B3 holds recall 1.00 / staleness 0.00 at every budget. The sharpest finding: **B2's
+staleness *rises* with budget** (0.00 → 0.50) — with no supersession, more context pulls
+the retired fact back in. Only B3 stays correct *and* small — measured, not asserted.
 
 ### Built with
 Python · FastAPI · FastMCP · Qdrant · `openai` SDK → Qwen Cloud / DashScope

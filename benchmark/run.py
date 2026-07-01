@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import re
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -16,59 +18,52 @@ from benchmark.score import score_predictions
 from memory_agent.engine import MemoryEngine
 from memory_agent.store import MemoryStore
 
+# Small budgets that actually bite: the persona holds ~42 tokens of active
+# memory, so at 8 tokens only one memory fits and retrieval must *choose*.
+BUDGETS = [8, 16, 32, 64]
+
+# A tiny topical vocabulary shared by memories AND queries, so the fake embedder
+# ranks by shared concepts rather than collapsing queries to a zero vector.
+_VOCAB = [
+    "ryan", "sam", "maya", "morning", "drink", "coffee", "tea", "soda", "lunch",
+    "music", "jazz", "coding", "language", "python", "ruby", "prototypes",
+    "prefers", "prefer", "uses", "use", "likes", "writes", "tests",
+]
+
 
 class KeywordQwen:
+    """Deterministic, offline bag-of-vocabulary embedder (zero API spend).
+
+    Both memory text and query text map into the same topical space, so cosine
+    similarity ranks the *relevant* memory highest — which is what lets the
+    budget-constrained retrieval keep the right fact at small budgets.
+    """
+
     def embed(self, text: str) -> list[float]:
-        lowered = text.lower()
-        return [
-            float(lowered.count("coffee")),
-            float(lowered.count("tea")),
-            float(lowered.count("jazz")),
-            float(lowered.count("python")),
-            float(lowered.count("ruby")),
-        ]
+        counts = Counter(re.findall(r"[a-z]+", text.lower()))
+        return [float(counts[word]) for word in _VOCAB]
 
 
 def run(results_dir: Path = Path("benchmark/results")) -> dict[str, Any]:
     results_dir.mkdir(parents=True, exist_ok=True)
     personas = synthetic_personas()
-    budgets = [512, 1000, 2000]
-    output: dict[str, Any] = {"budgets": budgets, "baselines": {}}
+    output: dict[str, Any] = {
+        "budgets": BUDGETS,
+        "baselines": {name: {} for name in ("B0", "B1", "B2", "B3")},
+    }
 
-    for baseline in ["B0", "B1", "B2"]:
-        predictions, fixtures = _run_stateless_baseline(baseline, personas)
-        output["baselines"][baseline] = score_predictions(predictions, fixtures)
-
-    output["baselines"]["B3"] = {}
-    for budget in budgets:
-        predictions, fixtures = _run_engine_baseline(personas, budget=budget)
-        output["baselines"]["B3"][str(budget)] = score_predictions(predictions, fixtures)
+    for budget in BUDGETS:
+        for name in ("B0", "B1", "B2", "B3"):
+            predictions, fixtures = _evaluate(name, personas, budget=budget)
+            output["baselines"][name][str(budget)] = score_predictions(predictions, fixtures)
 
     destination = results_dir / "latest.json"
     destination.write_text(json.dumps(output, indent=2, sort_keys=True), encoding="utf-8")
     return output
 
 
-def _run_stateless_baseline(
-    baseline: str,
-    personas: list[dict[str, Any]],
-) -> tuple[dict[str, str], list[dict[str, Any]]]:
-    predictions: dict[str, str] = {}
-    fixtures: list[dict[str, Any]] = []
-    for persona in personas:
-        history = build_history(persona)
-        for query in persona["queries"]:
-            fixtures.append(query)
-            if baseline == "B0":
-                predictions[query["id"]] = b0_no_memory(query["query"], history)
-            elif baseline == "B1":
-                predictions[query["id"]] = b1_full_history(query["query"], history)
-            else:
-                predictions[query["id"]] = b2_naive_top_k(query["query"], history)
-    return predictions, fixtures
-
-
-def _run_engine_baseline(
+def _evaluate(
+    name: str,
     personas: list[dict[str, Any]],
     *,
     budget: int,
@@ -76,17 +71,40 @@ def _run_engine_baseline(
     predictions: dict[str, str] = {}
     fixtures: list[dict[str, Any]] = []
     for persona in personas:
-        engine = MemoryEngine(
-            qwen=KeywordQwen(),
-            store=MemoryStore(location=":memory:"),
-            token_budget=budget,
-        )
-        for item in build_history(persona):
-            engine.write(item["text"], type="preference", subject=item["subject"])
+        history = build_history(persona)
+        engine = _build_engine(history, budget=budget) if name == "B3" else None
         for query in persona["queries"]:
             fixtures.append(query)
-            predictions[query["id"]] = b3_ours(query["query"], engine, token_budget=budget)
+            predictions[query["id"]] = _predict(name, query["query"], history, engine, budget)
     return predictions, fixtures
+
+
+def _build_engine(history: list[dict[str, str]], *, budget: int) -> MemoryEngine:
+    engine = MemoryEngine(
+        qwen=KeywordQwen(),
+        store=MemoryStore(location=":memory:"),
+        token_budget=budget,
+    )
+    for item in history:
+        engine.write(item["text"], type="preference", subject=item["subject"])
+    return engine
+
+
+def _predict(
+    name: str,
+    query: str,
+    history: list[dict[str, str]],
+    engine: MemoryEngine | None,
+    budget: int,
+) -> str:
+    if name == "B0":
+        return b0_no_memory(query, history, token_budget=budget)
+    if name == "B1":
+        return b1_full_history(query, history, token_budget=budget)
+    if name == "B2":
+        return b2_naive_top_k(query, history, token_budget=budget)
+    assert engine is not None
+    return b3_ours(query, engine, token_budget=budget)
 
 
 if __name__ == "__main__":

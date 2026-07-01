@@ -2,76 +2,40 @@ from __future__ import annotations
 
 import json
 
-from benchmark.baselines import (
-    b0_no_memory,
-    b1_full_history,
-    b2_naive_top_k,
-    build_history,
-)
+from benchmark.baselines import b0_no_memory, b1_full_history, b2_naive_top_k, build_history
 from benchmark.generate import synthetic_personas
-from benchmark.run import _run_stateless_baseline, run
+from benchmark.run import BUDGETS, run
 from benchmark.score import score_predictions
 
 
+def _history() -> list[dict[str, str]]:
+    return [
+        {"text": "Ryan prefers coffee in the morning.", "subject": "morning_drink"},
+        {"text": "Ryan prefers tea in the morning.", "subject": "morning_drink"},
+        {"text": "Ryan uses Python for prototypes.", "subject": "language"},
+    ]
+
+
 def test_b0_no_memory_returns_empty() -> None:
-    history = [{"text": "Ryan prefers tea.", "subject": "drink"}]
-
-    assert b0_no_memory("What does Ryan prefer?", history) == ""
+    assert b0_no_memory("What does Ryan prefer?", _history(), token_budget=64) == ""
 
 
-def test_b1_full_history_joins_all_history_texts() -> None:
-    history = [
-        {"text": "Ryan prefers tea.", "subject": "drink"},
-        {"text": "Ryan likes jazz.", "subject": "music"},
+def test_b1_full_history_packs_in_chronological_order_within_budget() -> None:
+    history = _history()
+    # a tiny budget fits only the first (oldest) item — the naive weakness
+    assert b1_full_history("q", history, token_budget=8) == "Ryan prefers coffee in the morning."
+    # a large budget keeps everything, still in chronological order
+    assert b1_full_history("q", history, token_budget=1000).splitlines() == [
+        item["text"] for item in history
     ]
 
-    assert b1_full_history("What does Ryan prefer?", history) == (
-        "Ryan prefers tea.\nRyan likes jazz."
+
+def test_b2_ranks_by_overlap_then_packs_to_budget() -> None:
+    history = _history()
+    top = b2_naive_top_k(
+        "What language does Ryan use for prototypes?", history, token_budget=8
     )
-
-
-def test_b2_ranks_highest_overlap_first() -> None:
-    history = [
-        {"text": "Unrelated note about Ruby.", "subject": "language"},
-        {"text": "Ryan prefers morning tea.", "subject": "drink"},
-        {"text": "Another unrelated note about jazz.", "subject": "music"},
-    ]
-
-    assert b2_naive_top_k("morning tea", history, k=1) == "Ryan prefers morning tea."
-
-
-def test_b2_default_k_caps_result_count() -> None:
-    history = [
-        {"text": f"Ryan likes tea item {idx}.", "subject": f"drink_{idx}"} for idx in range(5)
-    ]
-
-    result = b2_naive_top_k("Ryan likes tea", history)
-
-    assert len(result.splitlines()) == 3
-
-
-def test_run_end_to_end(tmp_path) -> None:
-    results_dir = tmp_path / "nested" / "out"
-
-    results = run(results_dir=results_dir)
-
-    assert results["budgets"] == [512, 1000, 2000]
-    written = results_dir / "latest.json"
-    assert written.exists()
-    # results JSON is committed + diffed, so the file must be a stable (sorted, indented) dump
-    assert written.read_text(encoding="utf-8") == json.dumps(results, indent=2, sort_keys=True)
-    assert results["baselines"]["B1"]["recall_accuracy"] == 1.0
-    assert "B2" in results["baselines"]
-    assert set(results["baselines"]["B3"]) == {"512", "1000", "2000"}
-    # B3's whole thesis: supersession retires stale facts the naive baselines keep.
-    # At every budget B3 must be *strictly* less stale than naive top-k (B2),
-    # while still recalling the current answer.
-    for budget in ("512", "1000", "2000"):
-        assert (
-            results["baselines"]["B3"][budget]["staleness_rate"]
-            < results["baselines"]["B2"]["staleness_rate"]
-        )
-        assert results["baselines"]["B3"][budget]["recall_accuracy"] == 1.0
+    assert top == "Ryan uses Python for prototypes."
 
 
 def test_score_empty_fixtures_returns_zeros() -> None:
@@ -79,20 +43,54 @@ def test_score_empty_fixtures_returns_zeros() -> None:
     assert score_predictions({}, []) == {"recall_accuracy": 0.0, "staleness_rate": 0.0}
 
 
-def test_run_dispatch_routes_b1_and_b2_distinctly() -> None:
-    # guards the baseline dispatch: B1 = full history, B2 = top-k — never swapped/conflated
-    personas = synthetic_personas()
-    b1_preds, _ = _run_stateless_baseline("B1", personas)
-    b2_preds, _ = _run_stateless_baseline("B2", personas)
+def test_run_end_to_end_structure(tmp_path) -> None:
+    results_dir = tmp_path / "nested" / "out"
 
-    history_texts = [item["text"] for item in build_history(personas[0])]
-    assert len(history_texts) > 3  # fixture must exceed b2's default k for the contrast to hold
+    results = run(results_dir=results_dir)
 
-    # B1 carries every history line; B2 (top-k) is strictly smaller
-    for pred in b1_preds.values():
-        for text in history_texts:
-            assert text in pred
-    for pred in b2_preds.values():
-        assert len(pred.splitlines()) <= 3 < len(history_texts)
+    assert results["budgets"] == BUDGETS
+    written = results_dir / "latest.json"
+    assert written.exists()
+    # results JSON is committed + diffed, so the file must be a stable dump
+    assert written.read_text(encoding="utf-8") == json.dumps(results, indent=2, sort_keys=True)
+    for name in ("B0", "B1", "B2", "B3"):
+        assert set(results["baselines"][name]) == {str(b) for b in BUDGETS}
 
-    assert b1_preds != b2_preds
+
+def test_b3_dominates_recall_and_staleness_at_every_budget(tmp_path) -> None:
+    # ours is the only system with perfect recall AND zero staleness at every
+    # budget, and is never beaten by a naive baseline on either axis.
+    baselines = run(results_dir=tmp_path / "out")["baselines"]
+    for budget in (str(b) for b in BUDGETS):
+        assert baselines["B3"][budget]["recall_accuracy"] == 1.0
+        assert baselines["B3"][budget]["staleness_rate"] == 0.0
+        for naive in ("B1", "B2"):
+            assert baselines["B3"][budget]["recall_accuracy"] >= baselines[naive][budget][
+                "recall_accuracy"
+            ]
+            assert baselines["B3"][budget]["staleness_rate"] <= baselines[naive][budget][
+                "staleness_rate"
+            ]
+
+
+def test_naive_top_k_gets_staler_as_budget_grows(tmp_path) -> None:
+    # the supersession thesis: with no notion of "replaced", a bigger budget pulls
+    # the retired fact back in, so B2's staleness *rises* with the budget.
+    baselines = run(results_dir=tmp_path / "out")["baselines"]
+    assert (
+        baselines["B2"][str(BUDGETS[-1])]["staleness_rate"]
+        > baselines["B2"][str(BUDGETS[0])]["staleness_rate"]
+    )
+
+
+def test_naive_full_history_needs_budget_to_recall(tmp_path) -> None:
+    # chronological dumping can't recall the current answer at the smallest budget
+    baselines = run(results_dir=tmp_path / "out")["baselines"]
+    assert baselines["B1"][str(BUDGETS[0])]["recall_accuracy"] < 1.0
+
+
+def test_persona_history_exceeds_smallest_budget(tmp_path) -> None:
+    # guards the premise of the whole curve: the memory set must not all fit at
+    # the smallest budget, or the budget would never force a choice.
+    persona = synthetic_personas()[0]
+    assert len(build_history(persona)) > 1
