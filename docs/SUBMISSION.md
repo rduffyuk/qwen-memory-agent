@@ -27,29 +27,47 @@ memory as a first-class, measurable engineering problem.
 - **Supersession-aware forgetting.** When a new fact contradicts an existing one of
   the same subject/type (e.g. "prefers tea" replacing "prefers coffee"), the old
   record is retired (`superseded_by`) so retrieval stops surfacing the stale value.
+- **Graded decay + reinforce-on-recall.** `effective_salience = salience · 0.5^(age /
+  half_life)` with per-type half-lives (`preference` pinned); recalling a memory
+  refreshes it. Hot memories persist, cold ones fade — *timely forgetting.*
+- **Typed retrieval — a second self-correcting layer.** A type-aware ranking prior
+  lets a durable `preference` outrank an equal-cosine throwaway note, and a
+  retrieval-time "one-active-per-`(subject,type)`, keep-newest" veto catches stale
+  contradictions the write path can miss (e.g. imported records).
 - **Budget-constrained recall.** Retrieval scores memories by
-  `α·cosine + β·recency + γ·salience` and greedily packs them until a configurable
-  token budget is hit — relevant context stays small.
-- **Exposed over MCP.** The memory tools are a FastMCP server, so any MCP client
-  (Claude, a demo UI) can drive the same memory engine.
+  `α·cosine + β·recency + γ·effective_salience + δ·type_prior` and greedily packs
+  them until a configurable token budget is hit — relevant context stays small.
+- **Portable memory.** The whole store round-trips as JSON (vectors preserved, no
+  re-embedding) or renders to Markdown — memory moves across sessions and machines.
+- **The dreaming loop (propose → approve).** An offline Qwen pass proposes
+  consolidations (merge / forget / re-salience); a human approves, then only
+  approved proposals are applied. It validates proposals against live record ids, so
+  it won't act on its own hallucinations.
+- **Token & model observability.** Every Qwen call's token usage is metered per
+  model and exposed at `/usage`; `/chat` reports the per-request delta.
+- **Exposed over MCP + HTTP.** Eight FastMCP tools and the matching HTTP routes let
+  any MCP client (Claude, a demo UI) or plain `curl` drive the same memory engine.
 
 ### How it's built (architecture)
-A FastAPI backend on **Alibaba Cloud ECS** runs the agent loop + a FastMCP server +
-the memory engine, backed by **Qdrant**. The agent calls **Qwen Cloud / DashScope**
-(reasoning model for the loop, `text-embedding` for vectors) over the
-OpenAI-compatible endpoint. The Qwen client has bounded retry/backoff for
-resilience.
+A FastAPI backend on **Alibaba Cloud ECS** runs the agent loop, the dreaming loop, a
+FastMCP server, and the memory engine, backed by **Qdrant**. The agent and the
+dreaming loop both call **Qwen Cloud / DashScope** (reasoning model for the loop,
+`text-embedding` for vectors) over the OpenAI-compatible endpoint. The Qwen client
+has bounded retry/backoff for resilience and meters token usage on every call. See
+`docs/architecture.png` for the rendered diagram.
 
 ### Why it should win (maps to the rubric)
-- **Technical Depth & Engineering (30%)** — Qwen function-calling tool-use, a
-  FastMCP integration, and a benchmark with real performance-optimization numbers.
-- **Innovation & AI Creativity (30%)** — supersession-aware forgetting +
-  budget-constrained recall, clean modular architecture, dependency-injected/mockable
-  Qwen client, retry/backoff error handling.
+- **Technical Depth & Engineering (30%)** — Qwen function-calling tool-use, an
+  eight-tool FastMCP integration, graded decay, a two-layer self-correcting
+  retrieval path, and a benchmark with real performance-optimization numbers.
+- **Innovation & AI Creativity (30%)** — supersession-aware forgetting + typed
+  retrieval veto + a human-in-the-loop dreaming loop that refuses to act on
+  hallucinated ids; clean modular architecture, dependency-injected/mockable Qwen
+  client, retry/backoff error handling.
 - **Problem Value & Impact (25%)** — memory is the universal agent pain point;
-  MIT-licensed, productisable.
-- **Presentation & Documentation (15%)** — architecture diagram + a benchmark curve,
-  not just "it remembered my name."
+  portable (export/import) and MIT-licensed, so it's productisable.
+- **Presentation & Documentation (15%)** — a rendered architecture diagram + a
+  benchmark curve + a fully offline test suite, not just "it remembered my name."
 
 ### The benchmark (the proof)
 Synthetic multi-session personas state preferences, **update** some (the
@@ -76,7 +94,8 @@ the retired fact back in. Only B3 stays correct *and* small — measured, not as
 
 ### Built with
 Python · FastAPI · FastMCP · Qdrant · `openai` SDK → Qwen Cloud / DashScope
-(reasoning + `text-embedding`) · pytest (fully offline test suite, zero-spend).
+(reasoning + `text-embedding`) · `tiktoken` (token-budget accounting) · pytest
+(fully offline test suite, zero-spend).
 
 ### Alibaba Cloud usage
 - Backend deployed on **ECS** (see `deploy/ecs_setup.md`).
@@ -88,7 +107,7 @@ Python · FastAPI · FastMCP · Qdrant · `openai` SDK → Qwen Cloud / DashScop
 - [x] Public repo + visible MIT license
 - [x] Code file using Alibaba Cloud APIs → `src/memory_agent/qwen.py`
 - [ ] Deploy-proof recording (backend on ECS) — **manual**
-- [ ] Architecture diagram (visual) — *in README*
+- [x] Architecture diagram (visual) → `docs/architecture.png` (+ Mermaid in README)
 - [ ] ~3-min demo video (YouTube/Vimeo, public) — **manual**
 - [x] Text description (above)
 - [x] Track identified: Track 1
