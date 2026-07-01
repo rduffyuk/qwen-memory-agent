@@ -251,3 +251,28 @@ def test_agent_final_turn_without_content_falls_back_to_best_effort_string() -> 
 
     assert isinstance(result.answer, str)
     assert result.answer == "Let me check."
+
+
+def test_system_prompt_directs_immediate_persistence_of_corrections() -> None:
+    # Live ECS bug: "yes I like anime that was my bad" produced NO tool call — the
+    # correction was acknowledged conversationally but never persisted, and it took
+    # two more explicit nudges before remember fired. The correction directive in
+    # the system prompt IS the fix, so pin its presence in what the model receives.
+    class CapturingQwen(ScriptedQwen):
+        def __init__(self) -> None:
+            super().__init__([SimpleNamespace(content="ok", tool_calls=[])])
+            self.seen_system = ""
+
+        def chat(self, messages, tools=None, model=None):
+            self.seen_system = messages[0]["content"]
+            return super().chat(messages, tools=tools, model=model)
+
+    qwen = CapturingQwen()
+    MemoryAgent(make_engine(qwen)).run("hello")
+
+    assert messages_mention_corrections(qwen.seen_system)
+
+
+def messages_mention_corrections(system_prompt: str) -> bool:
+    lowered = system_prompt.lower()
+    return "correct" in lowered and "immediately" in lowered and "supersession" in lowered

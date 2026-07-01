@@ -32,7 +32,11 @@ class MemoryAgent:
                 "role": "system",
                 "content": (
                     "You can use memory tools when helpful. Recall before answering if stored "
-                    "context may matter, remember durable user facts, and forget only when asked."
+                    "context may matter, remember durable user facts, and forget only when asked. "
+                    "When the user corrects or contradicts a stored fact — even casually "
+                    "('actually...', 'not anymore', 'that was my bad') — call remember with the "
+                    "corrected fact IMMEDIATELY, in that same turn; supersession retires the old "
+                    "record. Never acknowledge a correction without persisting it."
                 ),
             },
             {"role": "user", "content": user_message},
