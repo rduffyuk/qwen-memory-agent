@@ -32,7 +32,7 @@ flowchart TB
         DREAM["Dreaming loop<br/>propose → approve consolidation"]
         MCP["FastMCP server<br/>remember / recall / forget / stats<br/>export / import / dream / dream_apply"]
         ENG["Memory Engine<br/>write · retrieve · exact + semantic supersession<br/>typed retrieval · decay + reinforce · dreaming loop<br/>token-budget packing"]
-        QD[("Qdrant<br/>vector store (embedded)")]
+        QD[("Qdrant<br/>embedded vector store")]
         SNAP[("Disk snapshot<br/>memory.json · survives restart")]
     end
 
