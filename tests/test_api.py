@@ -144,3 +144,18 @@ def test_memory_import_malformed_payload_returns_400() -> None:
 
     assert response.status_code == 400
     assert "records list" in response.json()["detail"]
+
+
+def test_demo_serves_memory_inspector_page() -> None:
+    client = TestClient(create_app(_engine()))
+
+    response = client.get("/demo")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    body = response.text
+    # The inspector must wire to the real API surface it visualises.
+    assert "/memory/export" in body
+    assert "/chat" in body
+    assert "/dream" in body
+    assert "superseded" in body.lower()

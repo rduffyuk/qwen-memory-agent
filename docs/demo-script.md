@@ -9,7 +9,10 @@ Track 1 · MemoryAgent · Qwen Cloud / Alibaba ECS. Rubric: Technical Depth 30% 
 source scripts/demo.sh
 reset          # box only: clean store + fresh server, so you open on zeros
 ```
-Screen: terminal + browser side by side (browser on `docs/architecture.png` and `benchmark/results/context_efficiency.png`).
+**Film in the memory inspector: `http://<ECS_PUBLIC_IP>:8000/demo`** — chat on the left,
+live memory table on the right (superseded rows strike through on screen), dream panel below.
+Judges *watch* forgetting happen instead of reading JSON. Keep a terminal beside it for the
+`snapshot` beat; second browser tab on `docs/architecture.png` + `benchmark/results/context_efficiency.png`.
 
 ---
 
@@ -18,9 +21,11 @@ Show `health` then `usage` (all zeros — starting from nothing).
 > "Every agent that meets a user twice hits the same wall: where memories live, when to forget stale ones, and how to fit the *right* memory into a tight context window. Most demos just stuff the whole history in. This treats memory as a measurable engineering problem — on Qwen Cloud, deployed on Alibaba ECS."
 
 ## [0:20–1:00] Beat 1 — agentic memory + supersession (the hero) · Innovation
+In the inspector: type *"Remember I prefer coffee in the morning."* — the `tool: remember`
+chip appears on the reply and the coffee row pops into the live table. Then type
+*"Actually I prefer tea now. What is my morning drink?"* — on screen, **coffee strikes
+through to `superseded` as tea lands**. That visual is the pitch. Back it with the terminal:
 ```bash
-ask "Remember I prefer coffee in the morning."
-answer "Actually I prefer tea now. What is my morning drink?"
 snapshot        # show the coffee record with superseded_by pointing at tea
 ```
 > "The agent itself decides to call `remember` — that's Qwen function-calling; an agent *with* memory, not a database with an LLM bolted on." *(point at `tool_calls_made: ["remember"]`)*
@@ -40,6 +45,9 @@ usage
 > "Every Qwen call is metered per model — `qwen-plus` for reasoning, `text-embedding-v3` for vectors. Cost is a first-class signal, not a mystery."
 
 ## [2:00–2:35] Beat 4 — the dreaming loop · Innovation (the differentiator)
+In the inspector: press **Dream** — proposals appear with checkboxes; tick one, press
+**Apply approved**. Nothing changes until the human approves (say that out loud).
+Terminal equivalent if you prefer:
 ```bash
 dream           # proposes consolidations, each with an id
 # then apply ONLY an approved id (human-in-the-loop):

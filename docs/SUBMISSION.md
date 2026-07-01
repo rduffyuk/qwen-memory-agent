@@ -52,6 +52,9 @@ memory as a first-class, measurable engineering problem.
   model and exposed at `/usage`; `/chat` reports the per-request delta.
 - **Exposed over MCP + HTTP.** Eight FastMCP tools and the matching HTTP routes let
   any MCP client (Claude, a demo UI) or plain `curl` drive the same memory engine.
+- **Live memory inspector at `/demo`.** A zero-dependency single-file UI: chat on the
+  left, the live store on the right — you *watch* a contradicted fact strike through to
+  `superseded` in real time, and drive the dreaming loop's propose → approve → apply.
 
 ### How it's built (architecture)
 A FastAPI backend on **Alibaba Cloud ECS** runs the agent loop, the dreaming loop, a

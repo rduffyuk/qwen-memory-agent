@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import os
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 # Load DASHSCOPE_* from a local .env when running the server (e.g. `uv run uvicorn`)
@@ -132,6 +134,13 @@ def create_app(engine: MemoryEngine | None = None) -> FastAPI:
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/demo", response_class=HTMLResponse)
+    def demo() -> HTMLResponse:
+        # Single-file memory inspector (chat + live store table + dreaming loop).
+        # Read per request: trivial cost, and edits show up without a restart.
+        page = Path(__file__).with_name("inspector.html")
+        return HTMLResponse(page.read_text(encoding="utf-8"))
 
     @app.get("/usage")
     def usage() -> dict[str, Any]:
