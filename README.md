@@ -124,6 +124,65 @@ supersession-pair cosines were 0.879-0.908, while unrelated distractors were 0.6
 default `SUPERSEDE_THRESHOLD=0.9` is therefore conservative and should be revisited with a larger
 set rather than treated as a proven universal constant.
 
+### Active-use eval — does the agent *use* memory, or just recall it?
+
+Passive recall benchmarks saturate (see the 1.000s above) while the same systems fail when a
+memory from one session must gate a *decision* in a later one — MemoryArena
+([arXiv 2602.16313](https://arxiv.org/abs/2602.16313)) reports 40-60% task success for agents
+that ace LoCoMo. [`benchmark/active_use.py`](benchmark/active_use.py) tests exactly that: 10
+multi-session scenarios (constraint seeded in one session, decision demanded in a later one,
+including superseded-constraint chains), each graded by **three independent oracles** — decision
+outcome, store state via `/memory/export`, and recall-before-decision in the tool-call trace, so
+a lucky guess without consulting memory scores zero.
+
+**Live result on the deployed agent (real Qwen, fresh store): task_success 0.60** — outcome 0.80
+· store 0.90 · process 0.70, `benchmark/results/active_use.json`. Our agent lands inside
+MemoryArena's predicted band, and the eval caught three real defects the retrieval benchmark
+structurally cannot see (decision turns skipping recall; a generic-subject collision where an
+unrelated fact retired a dietary constraint; a missed cross-subject supersession). Full triage,
+including the harness's own graded false-positives from run 1:
+[`docs/qa/active-use-findings.md`](docs/qa/active-use-findings.md). We publish the 0.60 rather
+than tuning the scenarios until it flatters — the gap between 1.000 recall and 0.60 active use
+*is* the finding.
+
+## How this maps to 2026 memory research
+
+- **Forgetting as a first-class metric** — our staleness rate measures what the Memora benchmark
+  ([arXiv 2604.20006](https://arxiv.org/abs/2604.20006)) later named *forgetting-aware accuracy*.
+- **Memory as an auditable artifact** — the fuzz + active-use oracles grade the store, never the
+  model's prose, the evaluation stance of MEMPROBE
+  ([arXiv 2606.24595](https://arxiv.org/abs/2606.24595)); our honesty rule (an answer implying
+  "done" must match the store) is stricter than prose-grading.
+- **Honest baselines under a token budget** — EvoMemBench
+  ([arXiv 2605.18421](https://arxiv.org/abs/2605.18421)) shows long-context baselines beat most
+  memory systems on raw accuracy; memory wins on *accuracy at a budget*. Our context-efficiency
+  curve runs all baselines under identical token accounting for that reason.
+- **Active use over passive recall** — the active-use eval above adopts the MemoryArena
+  ([arXiv 2602.16313](https://arxiv.org/abs/2602.16313)) framing.
+- **Admission control, deliberately inverted** — A-MAC
+  ([arXiv 2603.04549](https://arxiv.org/abs/2603.04549)) gates memories at write time and
+  discards rejects. We accept-then-retire instead: superseded records stay queryable
+  (`history()`, temporal queries), because rejected memories are unauditable — the property
+  post-hoc audit work like MemAudit ([arXiv 2605.23723](https://arxiv.org/abs/2605.23723))
+  depends on.
+
+## Future work
+
+- **Memory governance**: domain-scoped writes + scoped retrieval, with the existing dreaming
+  loop as the gated cross-domain promotion mechanism (propose → human approve → apply) — the
+  primitives of governed shared memory ([arXiv 2606.24535](https://arxiv.org/abs/2606.24535),
+  [Collaborative Memory, arXiv 2505.18279](https://arxiv.org/abs/2505.18279)). Threat model:
+  one poisoned observation persists cross-session (eTAMP,
+  [arXiv 2604.02623](https://arxiv.org/abs/2604.02623)); quarantine-by-domain caps the blast
+  radius, and the provenance we already stamp enables the audit.
+- **Supersession repair** (from the active-use findings): require a cosine floor before
+  exact-subject supersession acts (stops generic-subject collisions), and route the 0.7-0.9
+  cosine band to the dreaming loop for human-approved consolidation instead of silent action.
+- **Temporal knowledge graph** for bi-temporal facts (Zep,
+  [arXiv 2501.13956](https://arxiv.org/abs/2501.13956)); **SLM-staged retrieval** for latency
+  (LightMem, [arXiv 2604.07798](https://arxiv.org/abs/2604.07798)); **trained memory policies**
+  (MemTrain, [arXiv 2606.03197](https://arxiv.org/abs/2606.03197)).
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

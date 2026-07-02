@@ -1,0 +1,186 @@
+{
+  "provenance": "live-47.236.147.17-2026-07-02",
+  "generated_at": "2026-07-02T17:51:11.241438+00:00",
+  "base_url_host": "47.236.147.17",
+  "scenario_count": 10,
+  "aggregate": {
+    "scenarios": 10,
+    "task_success_rate": 0.6,
+    "outcome_pass_rate": 0.8,
+    "store_pass_rate": 0.9,
+    "process_pass_rate": 0.7,
+    "constraint_violation_rate": 0.0,
+    "by_depth": {
+      "1": {
+        "n": 6,
+        "task_success": 0.6666666666666666
+      },
+      "2": {
+        "n": 3,
+        "task_success": 0.3333333333333333
+      },
+      "3": {
+        "n": 1,
+        "task_success": 1.0
+      }
+    }
+  },
+  "rows": [
+    {
+      "id": "veg-dish-d1",
+      "depth": 1,
+      "outcome_pass": true,
+      "store_pass": true,
+      "process_pass": true,
+      "task_success": true,
+      "violations": [],
+      "missing_active": [],
+      "missing_superseded": [],
+      "forbidden_active": [],
+      "tool_calls": [
+        "recall"
+      ],
+      "answer_head": "Paneer Tikka Masala"
+    },
+    {
+      "id": "shellfish-gift-d1",
+      "depth": 1,
+      "outcome_pass": true,
+      "store_pass": true,
+      "process_pass": true,
+      "task_success": true,
+      "violations": [],
+      "missing_active": [],
+      "missing_superseded": [],
+      "forbidden_active": [],
+      "tool_calls": [
+        "recall"
+      ],
+      "answer_head": "Thanks for the context \u2014 I see your brother has a **severe shellfish allergy**, and you\u2019re **strictly vegetarian** (thou"
+    },
+    {
+      "id": "laptop-budget-d1",
+      "depth": 1,
+      "outcome_pass": true,
+      "store_pass": true,
+      "process_pass": true,
+      "task_success": true,
+      "violations": [],
+      "missing_active": [],
+      "missing_superseded": [],
+      "forbidden_active": [],
+      "tool_calls": [
+        "recall"
+      ],
+      "answer_head": "Thank you \u2014 I recall your laptop budget is a hard cap of **\u00a3700**.\n\nTo recommend *one* well-fitting laptop, I also need "
+    },
+    {
+      "id": "tokyo-meeting-d1",
+      "depth": 1,
+      "outcome_pass": true,
+      "store_pass": true,
+      "process_pass": false,
+      "task_success": false,
+      "violations": [],
+      "missing_active": [],
+      "missing_superseded": [],
+      "forbidden_active": [],
+      "tool_calls": [],
+      "answer_head": "I'd be happy to help propose a start time for your 30-minute call next Tuesday! However, I don't have information about "
+    },
+    {
+      "id": "metal-music-d1",
+      "depth": 1,
+      "outcome_pass": true,
+      "store_pass": true,
+      "process_pass": true,
+      "task_success": true,
+      "violations": [],
+      "missing_active": [],
+      "missing_superseded": [],
+      "forbidden_active": [],
+      "tool_calls": [
+        "recall"
+      ],
+      "answer_head": "Based on your stored preferences \u2014 especially that you *hate heavy metal* \u2014 and the goal of a **focus playlist**, I reco"
+    },
+    {
+      "id": "neovim-editor-d1",
+      "depth": 1,
+      "outcome_pass": false,
+      "store_pass": true,
+      "process_pass": false,
+      "task_success": false,
+      "violations": [],
+      "missing_active": [],
+      "missing_superseded": [],
+      "forbidden_active": [],
+      "tool_calls": [],
+      "answer_head": "For a new Python project, set up **VS Code** with the Python extension. It\u2019s lightweight, highly customizable, and offer"
+    },
+    {
+      "id": "coffee-supersede-d2",
+      "depth": 2,
+      "outcome_pass": true,
+      "store_pass": false,
+      "process_pass": true,
+      "task_success": false,
+      "violations": [],
+      "missing_active": [],
+      "missing_superseded": [
+        "espresso"
+      ],
+      "forbidden_active": [],
+      "tool_calls": [
+        "recall"
+      ],
+      "answer_head": "Based on your preference for decaf (since you've quit caffeine completely), I suggest:  \n**A warm matcha latte made with"
+    },
+    {
+      "id": "city-move-d2",
+      "depth": 2,
+      "outcome_pass": false,
+      "store_pass": true,
+      "process_pass": false,
+      "task_success": false,
+      "violations": [],
+      "missing_active": [],
+      "missing_superseded": [],
+      "forbidden_active": [],
+      "tool_calls": [],
+      "answer_head": "I don\u2019t yet know where you live \u2014 could you tell me your city (or nearest major airport)? That way I can recommend the b"
+    },
+    {
+      "id": "headphone-budget-d2",
+      "depth": 2,
+      "outcome_pass": true,
+      "store_pass": true,
+      "process_pass": true,
+      "task_success": true,
+      "violations": [],
+      "missing_active": [],
+      "missing_superseded": [],
+      "forbidden_active": [],
+      "tool_calls": [
+        "recall"
+      ],
+      "answer_head": "Your headphone budget is **\u00a3150**.\n\nBased on that, here are three excellent options \u2014 all well-reviewed, within budget, "
+    },
+    {
+      "id": "birthday-dinner-d3",
+      "depth": 3,
+      "outcome_pass": true,
+      "store_pass": true,
+      "process_pass": true,
+      "task_success": true,
+      "violations": [],
+      "missing_active": [],
+      "missing_superseded": [],
+      "forbidden_active": [],
+      "tool_calls": [
+        "recall"
+      ],
+      "answer_head": "Based on your preferences, I recommend a **gluten-free-friendly Japanese izakaya** (casual pub-style restaurant) for you"
+    }
+  ]
+}

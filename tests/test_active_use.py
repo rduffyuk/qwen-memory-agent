@@ -51,6 +51,31 @@ def test_depth2_scenarios_check_supersession_in_store() -> None:
             assert scenario.get("store_superseded_required"), scenario["id"]
 
 
+def test_store_keywords_are_isolated_across_scenarios() -> None:
+    # Scenarios share ONE deployment store, so a store keyword owned by scenario A
+    # must never appear in scenario B's seeded text - live run 1 proved the failure
+    # mode: three diet scenarios cross-superseded each other's records and the
+    # store checks graded contamination, not behavior. Same discipline as the fuzz
+    # harness's unique rare nouns.
+    for scenario in SCENARIOS:
+        keywords = [
+            *scenario.get("store_active_required", []),
+            *scenario.get("store_superseded_required", []),
+            *scenario.get("store_active_forbidden", []),
+        ]
+        for other in SCENARIOS:
+            if other["id"] == scenario["id"]:
+                continue
+            other_text = " ".join(
+                message for session in other["sessions"] for message in session
+            ).casefold()
+            for keyword in keywords:
+                assert keyword.casefold() not in other_text, (
+                    f"store keyword {keyword!r} of {scenario['id']} leaks into "
+                    f"{other['id']}'s sessions - scenarios share one store"
+                )
+
+
 # ---------------------------------------------------------------------------
 # scorer unit tests
 # ---------------------------------------------------------------------------

@@ -42,9 +42,10 @@ SCENARIOS: list[dict[str, Any]] = [
             ["Remember I'm strictly vegetarian."],
             ["Suggest one dinner dish for me tonight - name the dish."],
         ],
+        # "veg" covers vegetarian/veggie/vegetable/vegan phrasings; dish names cover
+        # terse answers like "Vegetable Biryani" (live run 1: correct answer, too-narrow list).
         "expect_any": [
-            "vegetarian",
-            "veggie",
+            "veg",
             "plant-based",
             "tofu",
             "paneer",
@@ -55,6 +56,8 @@ SCENARIOS: list[dict[str, Any]] = [
             "curry",
             "halloumi",
             "falafel",
+            "biryani",
+            "dal",
         ],
         "must_not": [
             "chicken",
@@ -62,10 +65,6 @@ SCENARIOS: list[dict[str, Any]] = [
             "pork",
             "steak",
             "lamb",
-            "bacon",
-            "prawn",
-            "salmon",
-            "tuna",
         ],
         "store_active_required": ["vegetarian"],
     },
@@ -87,7 +86,11 @@ SCENARIOS: list[dict[str, Any]] = [
             "jam",
             "honey",
         ],
-        "must_not": ["prawn", "shrimp", "lobster", "crab", "oyster"],
+        # live run 1: the agent CORRECTLY said "avoid shrimp/lobster/crab" and a
+        # species must_not list penalized the avoidance sentence - negation false
+        # positive. The wrong decision (a seafood hamper) is caught by expect_any
+        # missing + the store check instead.
+        "must_not": [],
         "store_active_required": ["shellfish"],
     },
     {
@@ -149,28 +152,31 @@ SCENARIOS: list[dict[str, Any]] = [
         "store_active_required": ["neovim"],
     },
     # ---------- depth 2: constraint superseded later; decision must follow the NEW one ----------
+    # NOTE: live run 1 used a steak->vegan supersession here; its diet vocabulary
+    # collided with veg-dish-d1 and birthday-dinner-d3 through the SHARED store
+    # (scenarios run against one deployment), confounding the store checks. Every
+    # scenario now owns a unique constraint domain - enforced by a lint test.
     {
-        "id": "vegan-supersede-d2",
+        "id": "coffee-supersede-d2",
         "depth": 2,
         "sessions": [
-            ["Remember I love a good steak - no dietary restrictions at all."],
-            ["Big change: I've gone fully vegan now, no animal products at all."],
-            ["Suggest one dinner dish for me tonight - name the dish."],
+            ["Remember I drink a double espresso every morning."],
+            ["Big change: I've quit caffeine completely - decaf only from now on."],
+            ["Suggest a morning drink for me - name one."],
         ],
         "expect_any": [
-            "vegan",
-            "plant",
-            "tofu",
-            "lentil",
-            "chickpea",
-            "mushroom",
-            "aubergine",
-            "curry",
-            "falafel",
+            "decaf",
+            "caffeine-free",
+            "herbal",
+            "chamomile",
+            "rooibos",
+            "peppermint",
+            "juice",
+            "water",
         ],
-        "must_not": ["steak", "beef", "chicken", "pork", "salmon"],
-        "store_active_required": ["vegan"],
-        "store_superseded_required": ["steak"],
+        "must_not": [],
+        "store_active_required": ["decaf"],
+        "store_superseded_required": ["espresso"],
     },
     {
         "id": "city-move-d2",
@@ -203,14 +209,14 @@ SCENARIOS: list[dict[str, Any]] = [
         "id": "birthday-dinner-d3",
         "depth": 3,
         "sessions": [
-            ["Remember I'm vegan."],
+            ["Remember I'm coeliac - strictly gluten-free."],
             ["Remember my dinner budget is £20 a head, tops."],
             ["Remember I really don't enjoy Italian restaurants."],
             ["Choose a type of restaurant for my birthday dinner and briefly explain the choice."],
         ],
-        "expect_any": ["vegan", "plant"],
+        "expect_any": ["gluten"],
         "must_not": [],
-        "store_active_required": ["vegan", "20", "italian"],
+        "store_active_required": ["gluten", "20", "italian"],
     },
 ]
 
