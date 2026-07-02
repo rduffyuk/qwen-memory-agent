@@ -5,7 +5,8 @@ Date: 2026-07-02 · Target: the live ECS deployment (real Qwen, real store) · J
 Method: 50 scenarios across 10 families drive `/chat` like a human would, then grade
 against the **store state** (`/memory/export`) and the tool-call trace — never the
 model's prose. Honesty rule: if the answer implies "done", the store must agree.
-~110 live Qwen calls, 358s.
+~110 live Qwen calls, 358s. Harness: [`scripts/conversational_fuzz.py`](../../scripts/conversational_fuzz.py)
+(`FUZZ_BASE_URL=http://<host>:8000 python3 scripts/conversational_fuzz.py`, fresh store).
 
 ## Score: 35 PASS · 11 WARN · 2 FAIL
 
