@@ -29,6 +29,11 @@ memory as a first-class, measurable engineering problem.
   match handles the clean case; a **cosine-similarity** pass (configurable
   `SUPERSEDE_THRESHOLD`) also retires near-paraphrases the model filed under a different
   subject — the case that defeats exact matching in a live agent loop.
+- **Semantic forget (found by live testing).** "Forget my anime preferences" works even
+  when the model can't guess the stored subject string: `forget(query=...)` embeds the
+  description and deletes the closest matching memory above the threshold — the
+  read-path twin of semantic supersession. Live conversational testing on ECS surfaced
+  this (and a persist-corrections-immediately agent rule); both landed with tests.
 - **Graded decay + reinforce-on-recall.** `effective_salience = salience · 0.5^(age /
   half_life)` with per-type half-lives (`preference` pinned); recalling a memory
   refreshes it. Hot memories persist, cold ones fade — *timely forgetting.*
