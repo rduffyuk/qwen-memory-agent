@@ -135,6 +135,19 @@ including superseded-constraint chains), each graded by **three independent orac
 outcome, store state via `/memory/export`, and recall-before-decision in the tool-call trace, so
 a lucky guess without consulting memory scores zero.
 
+```mermaid
+flowchart LR
+    S["Sessions 1..N-1<br/>seed constraint(s)<br/>(incl. supersessions)"] -->|"new session id"| D["Final session<br/>decision turn"]
+    D --> O1["outcome oracle<br/>decision reflects constraint,<br/>no violation tokens"]
+    D --> O2["store oracle<br/>/memory/export:<br/>constraint active, stale retired"]
+    D --> O3["process oracle<br/>recall in tool_calls_made<br/>before the decision"]
+    O1 --> TS{"task_success<br/>= ALL three"}
+    O2 --> TS
+    O3 --> TS
+```
+
+![Active-use results](benchmark/results/active_use.png)
+
 **Live result on the deployed agent (real Qwen, fresh store): task_success 0.60** — outcome 0.80
 · store 0.90 · process 0.70, `benchmark/results/active_use.json`. Our agent lands inside
 MemoryArena's predicted band, and the eval caught three real defects the retrieval benchmark
