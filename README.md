@@ -181,13 +181,16 @@ than tuning the scenarios until it flatters — the gap between 1.000 recall and
 
 ## Future work
 
-- **Memory governance**: domain-scoped writes + scoped retrieval, with the existing dreaming
-  loop as the gated cross-domain promotion mechanism (propose → human approve → apply) — the
-  primitives of governed shared memory ([arXiv 2606.24535](https://arxiv.org/abs/2606.24535),
+- **Memory governance** — designed in
+  [`docs/design/memory-governance.md`](docs/design/memory-governance.md): domain-scoped writes +
+  scoped retrieval, with the existing dreaming loop as the gated cross-domain promotion
+  mechanism (propose → human approve → apply) — the primitives of governed shared memory
+  ([arXiv 2606.24535](https://arxiv.org/abs/2606.24535),
   [Collaborative Memory, arXiv 2505.18279](https://arxiv.org/abs/2505.18279)). Threat model:
   one poisoned observation persists cross-session (eTAMP,
   [arXiv 2604.02623](https://arxiv.org/abs/2604.02623)); quarantine-by-domain caps the blast
-  radius, and the provenance we already stamp enables the audit.
+  radius, and the provenance we already stamp enables the audit. Two of the four primitives
+  (temporal supersession, provenance) are already shipped.
 - **Supersession repair** (from the active-use findings): require a cosine floor before
   exact-subject supersession acts (stops generic-subject collisions), and route the 0.7-0.9
   cosine band to the dreaming loop for human-approved consolidation instead of silent action.
