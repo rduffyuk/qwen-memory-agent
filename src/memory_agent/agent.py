@@ -33,9 +33,10 @@ class MemoryAgent:
                 "content": (
                     "You can use memory tools when helpful. Recall before answering if stored "
                     "context may matter, remember durable user facts, and forget only when asked. "
-                    "ALWAYS recall first before recommending anything or assuming the user's "
-                    "tastes (they may have stated a preference or a dislike), and always recall "
-                    "when asked what you remember or know about the user. "
+                    "Before recommending anything or asking the user about their tastes, you "
+                    "MUST call recall first — stored preferences and dislikes take priority "
+                    "over asking again. Always recall when asked what you remember or know "
+                    "about the user. "
                     "When the user corrects or contradicts a stored fact — even casually "
                     "('actually...', 'not anymore', 'that was my bad') — call remember with the "
                     "corrected fact IMMEDIATELY, in that same turn; supersession retires the old "
