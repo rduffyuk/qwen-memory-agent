@@ -12,7 +12,8 @@ reset          # box only: clean store + fresh server, so you open on zeros
 **Film in the memory inspector: `http://<ECS_PUBLIC_IP>:8000/demo`** — chat on the left,
 live memory table on the right (superseded rows strike through on screen), dream panel below.
 Judges *watch* forgetting happen instead of reading JSON. Keep a terminal beside it for the
-`snapshot` beat; second browser tab on `docs/architecture.png` + `benchmark/results/context_efficiency.png`.
+`snapshot` beat; second browser tab on `docs/architecture.png` +
+`benchmark/results/context_efficiency.png` + `benchmark/results/active_use.png`.
 
 ---
 
@@ -56,9 +57,9 @@ curl -sS -X POST "$BASE/dream/apply" -H 'content-type: application/json' \
 ```
 > "An out-of-band Qwen pass proposes consolidations — merge, forget, re-salience. But it's human-in-the-loop: nothing applies until I approve, and it validates every proposal against live record ids, so it **refuses to act on its own hallucinations.**"
 
-## [2:35–3:00] Close — the proof · Presentation + credibility
-Switch to the browser: `benchmark/results/context_efficiency.png`.
-> "And this isn't 'it remembered my name.' A reproducible, offline benchmark scores four systems on a shrinking token budget. Ours — B3 — holds **recall 1.0, staleness 0.0 at every budget.** The sharp finding: naive RAG's staleness *rises* with budget — more context drags the retired fact back. Only ours stays correct **and** small. Measured, not asserted. MIT-licensed, portable, on Alibaba Cloud."
+## [2:35–3:00] Close — the proof, including the misses · Presentation + credibility
+Switch to the browser: `benchmark/results/context_efficiency.png`, then `benchmark/results/active_use.png`.
+> "And this isn't 'it remembered my name.' Offline benchmark: ours holds **recall 1.0, staleness 0.0 at every budget** — naive RAG actually gets *staler* as the budget grows. But recall saturates, so we built the harder eval the 2026 research asks for: does the agent **use** memory to gate later decisions? Live, on this deployment: **0.60** — right in the band the field reports for agents that ace recall. The three failure modes are named in the repo with designed fixes. We measure the misses too. MIT-licensed, portable, on Alibaba Cloud."
 
 ---
 

@@ -76,15 +76,19 @@ has bounded retry/backoff for resilience and meters token usage on every call. S
 ### Why it should win (maps to the rubric)
 - **Technical Depth & Engineering (30%)** — Qwen function-calling tool-use, an
   eight-tool FastMCP integration, graded decay, a two-layer self-correcting
-  retrieval path, and a benchmark with real performance-optimization numbers.
+  retrieval path, and TWO evals: an offline context-efficiency benchmark plus a
+  live active-use eval with triple-oracle grading.
 - **Innovation & AI Creativity (30%)** — supersession-aware forgetting + typed
   retrieval veto + a human-in-the-loop dreaming loop that refuses to act on
-  hallucinated ids; clean modular architecture, dependency-injected/mockable Qwen
-  client, retry/backoff error handling.
+  hallucinated ids, extended by a designed memory-governance model (quarantine
+  domains, dreaming loop as the gated promotion mechanism); clean modular
+  architecture, dependency-injected/mockable Qwen client, retry/backoff.
 - **Problem Value & Impact (25%)** — memory is the universal agent pain point;
   portable (export/import) and MIT-licensed, so it's productisable.
-- **Presentation & Documentation (15%)** — a rendered architecture diagram + a
-  benchmark curve + a fully offline test suite, not just "it remembered my name."
+- **Presentation & Documentation (15%)** — architecture diagram, two benchmark
+  charts, a research-mapping section tying each mechanism to the 2026 memory
+  literature, and honest findings docs that publish our own failure modes — not
+  just "it remembered my name."
 
 ### The benchmark (the proof)
 Synthetic multi-session personas state preferences, **update** some (the
@@ -118,6 +122,23 @@ cosines in `docs/embedding-validation.md`: supersession pairs scored 0.879-0.908
 while unrelated distractors scored 0.683-0.743. Because one pair landed below the
 default `SUPERSEDE_THRESHOLD=0.9`, the threshold is left unchanged but documented as
 conservative rather than treated as a proven universal constant.
+
+### The active-use eval (the harder proof)
+Recall benchmarks saturate — so we also measure whether the agent *uses* memory.
+Ten multi-session scenarios seed constraints (including superseded ones) and demand
+a decision in a **later** session, each graded by three independent oracles: the
+decision outcome, the store state via `/memory/export`, and recall-before-decision
+in the tool-call trace — a lucky guess without consulting memory scores zero.
+
+Live on the ECS deployment (real Qwen, fresh store): **task_success 0.60**
+(`benchmark/results/active_use.png`) — inside the 40-60% band MemoryArena
+(arXiv 2602.16313) reports for agents that ace passive recall. We publish the
+number and the full triage (`docs/qa/active-use-findings.md`): three named
+defects — decision turns that skip recall, a generic-subject supersession
+collision, and the sub-threshold paraphrase band — each with a designed fix
+(README future work + `docs/design/memory-governance.md`). The gap between
+recall 1.000 and active use 0.60 **is** the finding: measured, not asserted,
+including the misses.
 
 ### Built with
 Python · FastAPI · FastMCP · Qdrant · `openai` SDK → Qwen Cloud / DashScope
