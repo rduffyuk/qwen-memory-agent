@@ -275,4 +275,12 @@ def test_system_prompt_directs_immediate_persistence_of_corrections() -> None:
 
 def messages_mention_corrections(system_prompt: str) -> bool:
     lowered = system_prompt.lower()
-    return "correct" in lowered and "immediately" in lowered and "supersession" in lowered
+    # corrections directive (live bug 1) + recall-before-recommendations and
+    # recall-when-asked-what-you-remember (fuzz findings H-negation + J-list_all)
+    return (
+        "correct" in lowered
+        and "immediately" in lowered
+        and "supersession" in lowered
+        and "recommend" in lowered
+        and "what you remember" in lowered
+    )

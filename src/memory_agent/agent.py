@@ -33,6 +33,9 @@ class MemoryAgent:
                 "content": (
                     "You can use memory tools when helpful. Recall before answering if stored "
                     "context may matter, remember durable user facts, and forget only when asked. "
+                    "ALWAYS recall first before recommending anything or assuming the user's "
+                    "tastes (they may have stated a preference or a dislike), and always recall "
+                    "when asked what you remember or know about the user. "
                     "When the user corrects or contradicts a stored fact — even casually "
                     "('actually...', 'not anymore', 'that was my bad') — call remember with the "
                     "corrected fact IMMEDIATELY, in that same turn; supersession retires the old "
@@ -197,10 +200,12 @@ def _tool_specs() -> list[dict[str, Any]]:
             "function": {
                 "name": "forget",
                 "description": (
-                    "Delete memories. Prefer 'query' (natural-language description of the "
-                    "memory to forget — deletes the closest semantic match) unless you know "
-                    "the exact record_id or stored subject string. If the result reports "
-                    "forgotten: 0, nothing was deleted — tell the user honestly."
+                    "Delete memories. Prefer 'query' (deletes the closest semantic match). "
+                    "Phrase the query as the FACT ITSELF ('hates marzipan'), not a category "
+                    "label ('marzipan opinion') — category labels miss the match. If the "
+                    "result reports forgotten: 0, call recall with the same query and then "
+                    "forget by the returned record_id; if nothing matches, tell the user "
+                    "honestly that nothing was deleted."
                 ),
                 "parameters": {
                     "type": "object",
