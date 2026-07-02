@@ -9,3 +9,4 @@ __pycache__/
 
 # generated benchmark output (commit real results explicitly with: git add -f)
 benchmark/results/*.json
+active_use_rows.jsonl
