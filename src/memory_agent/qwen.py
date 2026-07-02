@@ -39,13 +39,14 @@ class QwenClient:
         *,
         api_key: str | None = None,
         base_url: str | None = None,
-        chat_model: str = DEFAULT_CHAT_MODEL,
-        embed_model: str = DEFAULT_EMBED_MODEL,
+        chat_model: str | None = None,
+        embed_model: str | None = None,
         max_retries: int = 3,
         backoff_base: float = 0.1,
     ) -> None:
-        self.chat_model = chat_model
-        self.embed_model = embed_model
+        # Env-overridable so a deployment can swap models without a code change.
+        self.chat_model = chat_model or os.getenv("QWEN_CHAT_MODEL", DEFAULT_CHAT_MODEL)
+        self.embed_model = embed_model or os.getenv("QWEN_EMBED_MODEL", DEFAULT_EMBED_MODEL)
         self.max_retries = max(1, max_retries)
         self.backoff_base = max(0.0, backoff_base)
         self._usage = _zero_usage_summary()
