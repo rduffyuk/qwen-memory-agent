@@ -69,17 +69,31 @@ class RecallWithoutBudgetQwen(FakeQwen):
         return type("Turn", (), {"content": "fake-answer", "tool_calls": []})()
 
 
+class ReembedQwen(FakeQwen):
+    def __init__(self, *, embed_model: str) -> None:
+        super().__init__()
+        self.embed_model = embed_model
+
+
 def _engine() -> MemoryEngine:
     return MemoryEngine(qwen=FakeQwen(), store=MemoryStore(location=":memory:"))
 
 
 def test_health_returns_ok() -> None:
-    client = TestClient(create_app(_engine()))
+    engine = _engine()
+    engine.write("Ryan prefers tea.", type="preference", subject="drink")
+    client = TestClient(create_app(engine))
 
     response = client.get("/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json() == {
+        "status": "ok",
+        "total": 1,
+        "active": 1,
+        "superseded": 0,
+        "embed_model_mismatch": 0,
+    }
 
 
 def test_chat_returns_answer_and_relevant_memories() -> None:
@@ -144,6 +158,22 @@ def test_memory_import_malformed_payload_returns_400() -> None:
 
     assert response.status_code == 400
     assert "records list" in response.json()["detail"]
+
+
+def test_memory_reembed_endpoint_returns_reembedded_count() -> None:
+    engine = MemoryEngine(
+        qwen=ReembedQwen(embed_model="embed-a"),
+        store=MemoryStore(location=":memory:"),
+    )
+    engine.write("Ryan prefers tea.", type="preference", subject="drink")
+    engine.qwen = ReembedQwen(embed_model="embed-b")
+    client = TestClient(create_app(engine))
+
+    response = client.post("/memory/reembed")
+
+    assert response.status_code == 200
+    assert response.json() == {"reembedded": 1}
+    assert engine.store.list_records()[0].embed_model == "embed-b"
 
 
 def test_demo_serves_memory_inspector_page() -> None:

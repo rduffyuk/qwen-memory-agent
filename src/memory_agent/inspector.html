@@ -189,6 +189,12 @@ function salBar(v) {
   return `<span class="sal"><i style="width:${pct}%"></i></span>${v.toFixed(2)}`;
 }
 
+function modelLine(r) {
+  const embed = r.embed_model || "legacy";
+  const source = r.source_model || "unknown";
+  return `embed: ${embed} / source: ${source}`;
+}
+
 async function refresh() {
   try {
     const [exp, usage] = await Promise.all([api("/memory/export"), api("/usage")]);
@@ -207,9 +213,10 @@ async function refresh() {
     for (const r of records) {
       const tr = document.createElement("tr");
       const isNew = !knownIds.has(r.id);
+      const provenance = modelLine(r);
       tr.className = (r.superseded_by ? "superseded" : "") + (isNew && knownIds.size ? " new-row" : "");
       tr.innerHTML =
-        `<td class="text-cell">${esc(r.text)}</td>` +
+        `<td class="text-cell" title="${esc(provenance)}">${esc(r.text)}<div class="muted">${esc(provenance)}</div></td>` +
         `<td class="muted">${esc(r.subject)}</td>` +
         `<td class="muted">${esc(r.type)}</td>` +
         `<td>${salBar(r.salience)}</td>` +

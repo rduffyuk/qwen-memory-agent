@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import pytest
+
 from memory_agent.engine import MemoryEngine
+from memory_agent.models import MemoryRecord
 from memory_agent.store import MemoryStore
 
 
@@ -19,8 +22,18 @@ class FakeQwen:
 
 
 class VectorQwen:
-    def __init__(self, vectors: dict[str, list[float]]) -> None:
+    def __init__(
+        self,
+        vectors: dict[str, list[float]],
+        *,
+        embed_model: str | None = None,
+        chat_model: str | None = None,
+    ) -> None:
         self.vectors = vectors
+        if embed_model is not None:
+            self.embed_model = embed_model
+        if chat_model is not None:
+            self.chat_model = chat_model
 
     def embed(self, text: str) -> list[float]:
         return self.vectors[text]
@@ -302,3 +315,133 @@ def test_forget_by_query_below_threshold_deletes_nothing() -> None:
 
     assert forgotten == 0
     assert engine.store.get(keep.id) is not None
+
+
+def test_write_stamps_model_provenance_and_json_round_trips_it() -> None:
+    engine = MemoryEngine(
+        qwen=VectorQwen(
+            {
+                "Ryan prefers tea.": [1.0, 0.0],
+                "tea": [1.0, 0.0],
+            },
+            embed_model="embed-a",
+        ),
+        store=MemoryStore(location=":memory:"),
+    )
+
+    record = engine.write(
+        "Ryan prefers tea.",
+        type="preference",
+        subject="drink",
+        source_model="chat-a",
+    )
+    snapshot = engine.export_json()
+    imported = MemoryEngine(
+        qwen=VectorQwen({"tea": [1.0, 0.0]}, embed_model="embed-a"),
+        store=MemoryStore(location=":memory:"),
+    )
+    imported_count = imported.import_json(snapshot)
+
+    assert record.embed_model == "embed-a"
+    assert record.source_model == "chat-a"
+    exported_record = snapshot["records"][0]["record"]
+    assert exported_record["embed_model"] == "embed-a"
+    assert exported_record["source_model"] == "chat-a"
+    assert imported_count == 1
+    imported_record = imported.retrieve("tea")[0]
+    assert imported_record.embed_model == "embed-a"
+    assert imported_record.source_model == "chat-a"
+
+
+def test_old_format_record_without_provenance_loads_and_retrieves() -> None:
+    engine = MemoryEngine(
+        qwen=VectorQwen({"tea query": [1.0, 0.0]}, embed_model="embed-a"),
+        store=MemoryStore(location=":memory:"),
+    )
+    legacy_record = MemoryRecord(
+        text="Ryan prefers tea.",
+        type="preference",
+        subject="drink",
+    ).model_dump(mode="json", exclude={"embed_model", "source_model"})
+
+    imported = engine.import_json(
+        {"version": 1, "records": [{"record": legacy_record, "vector": [1.0, 0.0]}]}
+    )
+    recalled = engine.retrieve("tea query")
+
+    assert imported == 1
+    assert recalled
+    assert recalled[0].text == "Ryan prefers tea."
+    assert recalled[0].embed_model is None
+    assert recalled[0].source_model is None
+
+
+def test_same_dimension_embedder_swap_hides_mismatches_and_skips_cross_space_supersession() -> None:
+    qwen_a = VectorQwen(
+        {
+            "Ryan prefers coffee.": [1.0, 0.0],
+        },
+        embed_model="embed-a",
+    )
+    engine = MemoryEngine(qwen=qwen_a, store=MemoryStore(location=":memory:"))
+    old = engine.write("Ryan prefers coffee.", type="preference", subject="old-drink")
+    engine.qwen = VectorQwen(
+        {
+            "coffee query": [1.0, 0.0],
+            "Ryan's drink is coffee.": [1.0, 0.0],
+        },
+        embed_model="embed-b",
+    )
+
+    recalled = engine.retrieve("coffee query")
+    new = engine.write("Ryan's drink is coffee.", type="preference", subject="new-drink")
+
+    assert recalled == []
+    assert engine.stats()["embed_model_mismatch"] == 1
+    assert engine.store.get(old.id).superseded_by is None
+    assert engine.store.get(new.id).embed_model == "embed-b"
+
+
+def test_reembed_restamps_mismatches_and_restores_retrieval() -> None:
+    engine = MemoryEngine(
+        qwen=VectorQwen({"Ryan prefers coffee.": [1.0, 0.0]}, embed_model="embed-a"),
+        store=MemoryStore(location=":memory:"),
+    )
+    record = engine.write("Ryan prefers coffee.", type="preference", subject="drink")
+    engine.qwen = VectorQwen(
+        {
+            "Ryan prefers coffee.": [0.0, 1.0],
+            "coffee query": [0.0, 1.0],
+        },
+        embed_model="embed-b",
+    )
+
+    before = engine.retrieve("coffee query")
+    reembedded = engine.reembed()
+    after = engine.retrieve("coffee query")
+
+    assert before == []
+    assert reembedded == 1
+    assert after and after[0].id == record.id
+    restored = engine.store.get(record.id)
+    assert restored is not None
+    assert restored.embed_model == "embed-b"
+    assert engine.store._vectors[record.id] == [0.0, 1.0]  # noqa: SLF001
+    assert engine.stats()["embed_model_mismatch"] == 0
+
+
+def test_different_dimension_query_raises_clear_error_before_qdrant_traceback() -> None:
+    engine = MemoryEngine(
+        qwen=VectorQwen(
+            {
+                "Ryan prefers coffee.": [1.0, 0.0],
+                "coffee query": [1.0, 0.0, 0.0],
+            },
+            embed_model="embed-a",
+        ),
+        store=MemoryStore(location=":memory:"),
+    )
+    engine.write("Ryan prefers coffee.", type="preference", subject="drink")
+
+    with pytest.raises(ValueError, match="query vector dimension mismatch"):
+        engine.retrieve("coffee query")

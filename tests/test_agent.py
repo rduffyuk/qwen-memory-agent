@@ -233,6 +233,39 @@ def test_agent_remember_propagates_run_session_id() -> None:
     assert records and records[0].session_id == "sess-1"
 
 
+def test_agent_remember_stamps_active_chat_model_and_preserves_it_after_chat_model_swap() -> None:
+    qwen = ScriptedQwen(
+        [
+            SimpleNamespace(
+                content=None,
+                tool_calls=[
+                    ToolCall(
+                        id="call_remember",
+                        name="remember",
+                        arguments={
+                            "text": "Ryan prefers tea.",
+                            "type": "preference",
+                            "subject": "drink",
+                        },
+                    )
+                ],
+            ),
+            SimpleNamespace(content="Stored.", tool_calls=[]),
+        ]
+    )
+    qwen.chat_model = "chat-a"
+    qwen.embed_model = "embed-a"
+    engine = make_engine(qwen)
+
+    MemoryAgent(engine).run("Remember I prefer tea.")
+    qwen.chat_model = "chat-b"
+
+    records = [record for record in engine.retrieve("tea") if record.subject == "drink"]
+    assert records
+    assert records[0].source_model == "chat-a"
+    assert records[0].embed_model == "embed-a"
+
+
 def test_agent_final_turn_without_content_falls_back_to_best_effort_string() -> None:
     # the model "gives up": a tool-calling turn, then a final turn with no content.
     # answer must be the prior non-empty content (a str), never None.

@@ -57,7 +57,7 @@ def create_mcp_server(engine: MemoryEngine) -> FastMCP:
 
     @mcp.tool(name="memory.stats")
     def stats() -> dict[str, int]:
-        return engine.store.stats()
+        return engine.stats()
 
     @mcp.tool(name="memory.export")
     def export() -> dict[str, Any]:

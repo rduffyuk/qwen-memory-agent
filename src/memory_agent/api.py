@@ -23,13 +23,20 @@ from memory_agent.agent import MemoryAgent
 from memory_agent.dream import DreamLoop, DreamProposal
 from memory_agent.engine import MemoryEngine
 from memory_agent.mcp_server import create_mcp_server
-from memory_agent.qwen import ChatTurn, QwenClient
+from memory_agent.qwen import (
+    DEFAULT_CHAT_MODEL,
+    DEFAULT_EMBED_MODEL,
+    ChatTurn,
+    QwenClient,
+)
 from memory_agent.store import MemoryStore
 
 
 class LazyQwenClient:
     def __init__(self) -> None:
         self._client: QwenClient | None = None
+        self.chat_model = DEFAULT_CHAT_MODEL
+        self.embed_model = DEFAULT_EMBED_MODEL
 
     def chat(
         self,
@@ -50,6 +57,8 @@ class LazyQwenClient:
     def _get_client(self) -> QwenClient:
         if self._client is None:
             self._client = QwenClient()
+            self.chat_model = self._client.chat_model
+            self.embed_model = self._client.embed_model
         return self._client
 
 
@@ -132,8 +141,8 @@ def create_app(engine: MemoryEngine | None = None) -> FastAPI:
     app.state.mcp = create_mcp_server(resolved_engine)
 
     @app.get("/health")
-    def health() -> dict[str, str]:
-        return {"status": "ok"}
+    def health() -> dict[str, Any]:
+        return {"status": "ok", **resolved_engine.stats()}
 
     @app.get("/demo", response_class=HTMLResponse)
     def demo() -> HTMLResponse:
@@ -175,7 +184,15 @@ def create_app(engine: MemoryEngine | None = None) -> FastAPI:
             imported = resolved_engine.import_json(data)
         except (KeyError, TypeError, ValueError, ValidationError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        return {"imported": imported, "stats": resolved_engine.store.stats()}
+        return {"imported": imported, "stats": resolved_engine.stats()}
+
+    @app.post("/memory/reembed")
+    def reembed_memory() -> dict[str, int]:
+        try:
+            reembedded = resolved_engine.reembed()
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {"reembedded": reembedded}
 
     @app.post("/dream")
     def dream() -> dict[str, Any]:

@@ -44,11 +44,15 @@ memory as a first-class, measurable engineering problem.
 - **Budget-constrained recall.** Retrieval scores memories by
   `α·cosine + β·recency + γ·effective_salience + δ·type_prior` and greedily packs
   them until a configurable token budget is hit — relevant context stays small.
-- **Portable memory.** The whole store round-trips as JSON (vectors preserved, no
-  re-embedding) or renders to Markdown — memory moves across sessions and machines.
+- **Portable memory.** The whole store round-trips as JSON or renders to Markdown.
+  Vectors are preserved for the same embedder; when the embedder changes, mismatched
+  records are detected, hidden from retrieval, and repaired only through explicit
+  `/memory/reembed` maintenance.
 - **Persistent across restarts.** With `MEMORY_PERSIST_PATH` set, the store writes an
   atomic JSON snapshot on every change and reloads it on startup (rebuilding the vector
   index) — memories survive a full server restart, not just process lifetime.
+- **Model provenance.** Memories now stamp the chat model that wrote them and the
+  embedding model that produced their vector; cryptographic signing is a future extension.
 - **The dreaming loop (propose → approve).** An out-of-band Qwen pass proposes
   consolidations (merge / forget / re-salience); a human approves, then only
   approved proposals are applied. It validates proposals against live record ids, so

@@ -53,16 +53,24 @@ class MemoryEngine:
         subject: str | None = None,
         salience: float = 0.5,
         session_id: str | None = None,
+        source_model: str | None = None,
     ) -> MemoryRecord:
+        embed_model = self._current_embed_model()
         record = MemoryRecord(
             text=text,
             type=type,
             subject=subject or _infer_subject(text),
             salience=salience,
             session_id=session_id,
+            source_model=source_model,
+            embed_model=embed_model,
         )
         vector = self.qwen.embed(record.text)
-        for prior in self.store.active_by_subject_type(record.subject, record.type):
+        for prior in self.store.active_by_subject_type(
+            record.subject,
+            record.type,
+            embed_model=embed_model,
+        ):
             if prior.text.strip().casefold() != record.text.strip().casefold():
                 self.store.mark_superseded(prior.id, record.id)
 
@@ -72,6 +80,7 @@ class MemoryEngine:
             type=record.type,
             exclude_id=record.id,
             min_cosine=self.supersede_threshold,
+            embed_model=embed_model,
         )
         if match is not None and match.superseded_by is None and match.id != record.id:
             self.store.mark_superseded(match.id, record.id)
@@ -88,7 +97,11 @@ class MemoryEngine:
     ) -> list[MemoryRecord]:
         budget = token_budget if token_budget is not None else self.token_budget
         query_vector = self.qwen.embed(query)
-        candidates = self.store.search(query_vector, limit=limit)
+        candidates = self.store.search(
+            query_vector,
+            limit=limit,
+            embed_model=self._current_embed_model(),
+        )
         ranked = sorted(
             candidates,
             key=lambda result: self._hybrid_score(result, prefer_type=prefer_type),
@@ -137,7 +150,11 @@ class MemoryEngine:
             # the read-path twin of semantic supersession. The model cannot reliably
             # guess stored subject strings (a dream-merge may file under 'user'), so
             # exact-subject forgetting alone leaves records unremovable via chat.
-            results = self.store.search(self.qwen.embed(query), limit=1)
+            results = self.store.search(
+                self.qwen.embed(query),
+                limit=1,
+                embed_model=self._current_embed_model(),
+            )
             if results and results[0].cosine >= self.supersede_threshold:
                 return int(self.store.delete(results[0].record.id))
             return 0
@@ -188,6 +205,17 @@ class MemoryEngine:
             self.store.upsert(record, vector)
             imported += 1
         return imported
+
+    def reembed(self) -> int:
+        embed_model = self._current_embed_model()
+        mismatched = self.store.records_with_embed_model_mismatch(embed_model)
+        for record in mismatched:
+            vector = self.qwen.embed(record.text)
+            self.store.upsert(record.model_copy(update={"embed_model": embed_model}), vector)
+        return len(mismatched)
+
+    def stats(self) -> dict[str, int]:
+        return self.store.stats(embed_model=self._current_embed_model())
 
     def export_markdown(self) -> str:
         stats = self.store.stats()
@@ -244,6 +272,9 @@ class MemoryEngine:
             self.store.upsert(updated, self.store._vectors[record.id])
             reinforced.append(updated)
         return reinforced
+
+    def _current_embed_model(self) -> str | None:
+        return getattr(self.qwen, "embed_model", None)
 
 
 def effective_salience(record: MemoryRecord) -> float:

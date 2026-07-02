@@ -100,6 +100,7 @@ class MemoryAgent:
                 subject=arguments.get("subject"),
                 salience=float(arguments.get("salience", 0.5)),
                 session_id=arguments.get("session_id") or session_id,
+                source_model=getattr(self.engine.qwen, "chat_model", None),
             )
             return record.model_dump(mode="json")
 

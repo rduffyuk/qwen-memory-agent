@@ -15,9 +15,10 @@ measurable engineering problem, and every capability maps to a Track-1 requireme
 - **Graded, time-based decay + reinforce-on-recall** — `effective_salience = salience · 0.5^(age / half_life)` (per-type half-lives; `preference` pinned). Recalling a memory refreshes it (`access_count`, `last_accessed`), so hot memories stay and cold ones fade — *"timely forgetting of outdated information."*
 - **Typed retrieval — a second self-correcting layer** — a type-aware ranking prior (a durable `preference` outranks a throwaway `episodic` note of equal cosine) *plus* a retrieval-time "one-active-per-`(subject, type)`, keep-newest" veto that catches stale contradictions the write path can miss (e.g. records that arrive via import). *"Recall the most critical memories under limited context."*
 - **Budget-constrained recall** — retrieval scores memories by `α·cosine + β·recency + γ·effective_salience + δ·type_prior` and greedily packs them until a configurable token budget is hit, so context stays small *and* relevant.
-- **Portable memory (export / import)** — the whole store round-trips as JSON (vectors preserved, no re-embedding) or renders to Markdown, so memory moves *across sessions and machines.*
+- **Portable memory (export / import)** — the whole store round-trips as JSON or renders to Markdown. Vectors are preserved for the same embedder; if you swap embedders, mismatched records are detected and hidden until the explicit `POST /memory/reembed` maintenance pass spends credits to heal them.
 - **Persistent across restarts** — set `MEMORY_PERSIST_PATH` and the store writes an atomic JSON snapshot on every change and reloads it on startup (rebuilding the vector index), so memories **survive a full server restart** — real persistence, not process-lifetime state.
 - **The dreaming loop (propose → approve)** — an out-of-band Qwen pass reviews the store and *proposes* consolidations (merge / forget / re-salience); a human approves, then only approved proposals are applied. It validates every proposal against live record ids, so it refuses to act on its own hallucinations. *"Autonomously accumulate experience"* — with a human in the loop.
+- **Model provenance** — each memory can carry both the chat model that wrote it (`source_model`) and the embedding model that produced its vector (`embed_model`), and export/import preserves those fields. Cryptographic signing is a future extension, not claimed here.
 - **Token & model observability** — every Qwen call's `usage` (prompt / completion / total tokens, per model) is accumulated and exposed at `/usage`; `/chat` reports the per-request token delta.
 - **A reproducible benchmark** — synthetic multi-session personas, a held-out query set, and baselines (no-memory / full-history / naive-RAG / ours), scored on context recall (retrieval-level, model-free), **staleness rate**, and a **context-efficiency curve**.
 - **A live memory inspector at `/demo`** — a zero-dependency single-file UI: chat on the left, the live store on the right. You *watch* a contradicted fact strike through to `superseded` in real time, and drive the dreaming loop's propose → approve → apply.
@@ -30,7 +31,7 @@ flowchart TB
     U["MCP client / demo UI"]
 
     subgraph ecs["Alibaba Cloud ECS (Singapore)"]
-        API["FastAPI backend<br/>/chat · /health · /usage · /demo<br/>/memory/export · /memory/import<br/>/dream · /dream/apply"]
+        API["FastAPI backend<br/>/chat · /health · /usage · /demo<br/>/memory/export · /memory/import · /memory/reembed<br/>/dream · /dream/apply"]
         AGENT["MemoryAgent loop<br/>Qwen function-calling"]
         DREAM["Dreaming loop<br/>propose → approve consolidation"]
         MCP["FastMCP server<br/>remember / recall / forget / stats<br/>export / import / dream / dream_apply"]
@@ -64,8 +65,9 @@ The agent loop (`/chat`) lets Qwen choose tool calls; the same memory engine is 
 | `POST /chat` | `memory.remember` / `recall` / `forget` | agent loop; Qwen picks memory tools |
 | `GET /usage` | — | accumulated token usage (per model) |
 | `GET /memory/export` · `POST /memory/import` | `memory.export` / `memory.import` | round-trip the store (JSON + Markdown) |
+| `POST /memory/reembed` | — | explicit credit-spending repair after an embedding-model swap |
 | `POST /dream` · `POST /dream/apply` | `memory.dream` / `memory.dream_apply` | propose consolidations, then apply approved ones |
-| `GET /health` | `memory.stats` | liveness / store counts |
+| `GET /health` | `memory.stats` | liveness / store counts, including embed-model mismatches |
 | `GET /demo` | — | live memory inspector (chat + store table + dreaming loop UI) |
 
 ## Stack

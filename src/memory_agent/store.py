@@ -7,7 +7,14 @@ from dataclasses import dataclass
 
 import numpy as np
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, PointIdsList, PointStruct, VectorParams
+from qdrant_client.models import (
+    Distance,
+    Filter,
+    HasIdCondition,
+    PointIdsList,
+    PointStruct,
+    VectorParams,
+)
 
 from memory_agent.models import MemoryRecord
 
@@ -65,9 +72,18 @@ class MemoryStore:
         *,
         limit: int = 20,
         include_superseded: bool = False,
+        embed_model: str | None = None,
     ) -> list[SearchResult]:
         with self._lock:
             if not self._records or self._vector_size is None:
+                return []
+            self._ensure_query_dimension(len(vector))
+            compatible_ids = [
+                record_id
+                for record_id, record in self._records.items()
+                if _matches_embed_model(record.embed_model, embed_model)
+            ]
+            if not compatible_ids:
                 return []
 
             results: list[SearchResult] = []
@@ -75,11 +91,14 @@ class MemoryStore:
             points = self.client.query_points(
                 collection_name=self.collection_name,
                 query=vector,
+                query_filter=Filter(must=[HasIdCondition(has_id=compatible_ids)]),
                 limit=query_limit,
             ).points
             for point in points:
                 record = self._records.get(str(point.id))
                 if record is None:
+                    continue
+                if not _matches_embed_model(record.embed_model, embed_model):
                     continue
                 if record.superseded_by and not include_superseded:
                     continue
@@ -131,12 +150,21 @@ class MemoryStore:
         with self._lock:
             return [(record, list(self._vectors[record.id])) for record in self._records.values()]
 
-    def active_by_subject_type(self, subject: str, type: str) -> list[MemoryRecord]:
+    def active_by_subject_type(
+        self,
+        subject: str,
+        type: str,
+        *,
+        embed_model: str | None = None,
+    ) -> list[MemoryRecord]:
         with self._lock:
             return [
                 record
                 for record in self._records.values()
-                if record.subject == subject and record.type == type and not record.superseded_by
+                if record.subject == subject
+                and record.type == type
+                and not record.superseded_by
+                and _matches_embed_model(record.embed_model, embed_model)
             ]
 
     def most_similar_active(
@@ -146,6 +174,7 @@ class MemoryStore:
         type: str,
         exclude_id: str,
         min_cosine: float,
+        embed_model: str | None = None,
     ) -> MemoryRecord | None:
         with self._lock:
             best_record: MemoryRecord | None = None
@@ -155,6 +184,7 @@ class MemoryStore:
                     record_id == exclude_id
                     or record.type != type
                     or record.superseded_by is not None
+                    or not _matches_embed_model(record.embed_model, embed_model)
                 ):
                     continue
                 cosine = _cosine(vector, self._vectors[record_id])
@@ -163,13 +193,22 @@ class MemoryStore:
                     best_cosine = cosine
             return best_record
 
-    def stats(self) -> dict[str, int]:
+    def records_with_embed_model_mismatch(self, embed_model: str | None) -> list[MemoryRecord]:
+        with self._lock:
+            return [
+                record
+                for record in self._records.values()
+                if _is_embed_model_mismatch(record.embed_model, embed_model)
+            ]
+
+    def stats(self, *, embed_model: str | None = None) -> dict[str, int]:
         with self._lock:
             active = len(self.list_records())
             return {
                 "total": len(self._records),
                 "active": active,
                 "superseded": len(self._records) - active,
+                "embed_model_mismatch": len(self.records_with_embed_model_mismatch(embed_model)),
             }
 
     def _ensure_collection(self, vector_size: int) -> None:
@@ -178,7 +217,8 @@ class MemoryStore:
                 return
             if self._vector_size is not None and self._vector_size != vector_size:
                 raise ValueError(
-                    f"collection vector size is {self._vector_size}, got vector with size {vector_size}"
+                    "upsert vector dimension mismatch: "
+                    f"index uses {self._vector_size}, got {vector_size}"
                 )
             if not self.client.collection_exists(self.collection_name):
                 self.client.create_collection(
@@ -186,6 +226,13 @@ class MemoryStore:
                     vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
                 )
             self._vector_size = vector_size
+
+    def _ensure_query_dimension(self, vector_size: int) -> None:
+        if self._vector_size is not None and self._vector_size != vector_size:
+            raise ValueError(
+                "query vector dimension mismatch: "
+                f"index uses {self._vector_size}, got {vector_size}"
+            )
 
     def _snapshot(self) -> dict[str, object]:
         with self._lock:
@@ -242,6 +289,10 @@ class MemoryStore:
 
 
 def _cosine(left: list[float], right: list[float]) -> float:
+    if len(left) != len(right):
+        raise ValueError(
+            "vector dimension mismatch: " f"left has {len(left)}, right has {len(right)}"
+        )
     left_arr = np.array(left, dtype=float)
     right_arr = np.array(right, dtype=float)
     left_norm = np.linalg.norm(left_arr)
@@ -249,3 +300,14 @@ def _cosine(left: list[float], right: list[float]) -> float:
     if left_norm == 0.0 or right_norm == 0.0:
         return 0.0
     return float(np.dot(left_arr, right_arr) / (left_norm * right_norm))
+
+
+def _matches_embed_model(record_embed_model: str | None, current_embed_model: str | None) -> bool:
+    return record_embed_model is None or record_embed_model == current_embed_model
+
+
+def _is_embed_model_mismatch(
+    record_embed_model: str | None,
+    current_embed_model: str | None,
+) -> bool:
+    return record_embed_model is not None and record_embed_model != current_embed_model

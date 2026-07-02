@@ -17,6 +17,8 @@ class MemoryRecord(BaseModel):
     access_count: int = 0
     session_id: str | None = None
     superseded_by: str | None = None
+    source_model: str | None = None
+    embed_model: str | None = None
 
     @model_validator(mode="before")
     @classmethod

@@ -108,7 +108,12 @@ def test_api_exports_markdown_and_json_then_imports_into_fresh_app() -> None:
     assert import_response.status_code == 200
     body = import_response.json()
     assert body["imported"] == 4
-    assert body["stats"] == {"total": 4, "active": 3, "superseded": 1}
+    assert body["stats"] == {
+        "total": 4,
+        "active": 3,
+        "superseded": 1,
+        "embed_model_mismatch": 0,
+    }
 
 
 def test_mcp_memory_export_and_import_are_registered_and_functional() -> None:
