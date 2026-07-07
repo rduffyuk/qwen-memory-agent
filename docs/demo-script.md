@@ -32,6 +32,18 @@ snapshot        # show the coffee record with superseded_by pointing at tea
 > "The agent itself decides to call `remember` — that's Qwen function-calling; an agent *with* memory, not a database with an LLM bolted on." *(point at `tool_calls_made: ["remember"]`)*
 > "Now I contradict myself… and it answers **tea**. The old fact wasn't just outranked — it was **retired**: here's coffee marked `superseded_by` the tea record. Timely forgetting — exact match plus a cosine pass for paraphrases."
 
+**The clincher (from live testing — say this over the `snapshot` output):** the coffee record is
+`subject=user`, but the model filed tea under `subject=prefers_tea_as_morning_drink` — the subjects
+**don't match**. Exact `(subject, type)` matching would have missed it and left both active. It got
+retired anyway, so *this is the cosine/semantic path, not string matching* — the exact case the README
+says "defeats exact matching in a live agent loop."
+> "Watch the subjects — the model filed tea under a *different* subject than coffee. String matching would've kept both. It retired coffee anyway: that's **semantic** supersession by embedding cosine, not a key lookup."
+
+**(Optional +15s — show BOTH mechanisms) Second contradiction:** type *"I used to like anime but not
+anymore."* The old `likes anime` (`subject=user`) is retired by a new record with the **same** subject —
+that's the **exact-match** path, and the model even preserves detail (`e.g. Overlord`) and promotes it to
+`type=preference` (durable, salience pinned). One demo, both retirement paths: exact *and* semantic.
+
 ## [1:00–1:30] Beat 2 — budget-constrained recall · Technical Depth
 ```bash
 curl -sS -X POST "$BASE/chat" -H 'content-type: application/json' \

@@ -44,10 +44,26 @@ dream()    { curl -sS -X POST "$BASE/dream" | jq; }
 
 # box only: clean slate for a fresh take (needs .env in cwd with the DashScope key)
 reset() {
-  pkill -f "uvicorn memory_agent.api" 2>/dev/null
+  # 1) stop the server, then VERIFY it is dead before removing the snapshot.
+  #    A dying worker re-persists memory.json after an early rm — the record leaks
+  #    back and the store opens non-empty (bracket pattern so pkill can't match itself).
+  pkill -f "[u]vicorn memory_agent.api" 2>/dev/null
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    pgrep -f "[u]vicorn memory_agent.api" >/dev/null || break
+    sleep 0.5
+  done
+  if pgrep -f "[u]vicorn memory_agent.api" >/dev/null; then
+    pkill -9 -f "[u]vicorn memory_agent.api" 2>/dev/null; sleep 1
+  fi
+  # 2) now the snapshot is safe to delete.
   rm -f memory.json
+  # 3) relaunch fully detached (setsid + </dev/null) so it survives the SSH session exit;
+  #    plain `nohup &` gets SIGHUP'd when the shell closes and the server dies.
   set -a; source .env; set +a
-  nohup uv run uvicorn memory_agent.api:app --host 0.0.0.0 --port 8000 > ~/api.log 2>&1 &
+  setsid nohup uv run uvicorn memory_agent.api:app --host 0.0.0.0 --port 8000 \
+    > ~/api.log 2>&1 < /dev/null &
   until curl -sS "http://localhost:8000/health" >/dev/null 2>&1; do sleep 0.5; done
-  echo "reset: store wiped, server restarted, health ok"
+  local total
+  total=$(curl -sS "http://localhost:8000/health" | sed -n 's/.*"total":\([0-9]*\).*/\1/p')
+  echo "reset: store wiped, server restarted, health ok (total=${total:-?})"
 }
