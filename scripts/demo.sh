@@ -59,6 +59,9 @@ reset() {
   rm -f memory.json
   # 3) relaunch fully detached (setsid + </dev/null) so it survives the SSH session exit;
   #    plain `nohup &` gets SIGHUP'd when the shell closes and the server dies.
+  #    A non-interactive `ssh host '...'` shell does NOT have ~/.local/bin on PATH,
+  #    so `uv` isn't found and the relaunch dies silently — source its env first.
+  command -v uv >/dev/null 2>&1 || . "$HOME/.local/bin/env" 2>/dev/null || export PATH="$HOME/.local/bin:$PATH"
   set -a; source .env; set +a
   setsid nohup uv run uvicorn memory_agent.api:app --host 0.0.0.0 --port 8000 \
     > ~/api.log 2>&1 < /dev/null &
