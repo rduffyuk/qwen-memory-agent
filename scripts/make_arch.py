@@ -165,9 +165,9 @@ fastapi = box(
     COMP,
     COMP_EDGE,
     "FastAPI backend",
-    "/chat · /health · /usage · /memory/* · /dream · /dream/apply",
+    "/chat · /health · /usage · /demo · /memory/* · /dream · /dream/apply",
     tsize=13,
-    ssize=8.5,
+    ssize=8,
 )
 agent = box(
     cx0,
