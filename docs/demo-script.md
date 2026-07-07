@@ -59,11 +59,20 @@ curl -sS -X POST "$BASE/chat" -H 'content-type: application/json' \
 ```
 *)*
 
-## [1:30–2:00] Beat 3 — token observability · engineering rigor
+## [1:30–2:00] Beat 3 — token observability + MCP-native surface · engineering rigor
 ```bash
 usage
 ```
 > "Every Qwen call is metered per model — `qwen-plus` for reasoning, `text-embedding-v3` for vectors. Cost is a first-class signal, not a mystery."
+
+**MCP call-out (~10s — this is Track 1's headline, don't skip it):** everything you've just
+seen over HTTP is *also* exposed as **8 FastMCP tools** — `memory.remember / recall / forget /
+stats / export / import / dream / dream_apply` — so any MCP client (Claude, an IDE agent) drives
+the exact same engine. Optional on-screen proof, a terminal one-liner listing the live tools:
+```bash
+PYTHONPATH=src uv run --no-sync python -c "import asyncio; from fastmcp import Client; from memory_agent.mcp_server import mcp; print([t.name for t in asyncio.run(Client(mcp).list_tools())])"
+```
+> "And this isn't just an HTTP demo — it's **MCP-native**. The same memory engine is eight FastMCP tools, so Claude or any MCP client uses `remember`, `recall`, `forget`, the dreaming loop — the whole surface — natively. That's the *MemoryAgent* in Track 1."
 
 ## [2:00–2:35] Beat 4 — the dreaming loop · Innovation (the differentiator)
 In the inspector: press **Dream** — proposals appear with checkboxes; tick one, press
@@ -80,6 +89,9 @@ curl -sS -X POST "$BASE/dream/apply" -H 'content-type: application/json' \
 ## [2:35–3:00] Close — the proof, including the misses · Presentation + credibility
 Switch to the browser: `benchmark/results/context_efficiency.png`, then `benchmark/results/active_use.png`.
 > "And this isn't 'it remembered my name.' Offline benchmark: ours holds **recall 1.0, staleness 0.0 at every budget** — naive RAG actually gets *staler* as the budget grows. But recall saturates, so we built the harder eval the 2026 research asks for: does the agent **use** memory to gate later decisions? Live, on this deployment: **0.60** — right in the band the field reports for agents that ace recall. The three failure modes are named in the repo with designed fixes. We measure the misses too. MIT-licensed, portable, on Alibaba Cloud."
+
+**Breadth name-check (~8s — so judges know the depth exists beyond what fit in 3 min):**
+> "What you saw is the spine — there's more in the repo: memory **persists across a full server restart**, the whole store **exports and re-imports** as JSON or Markdown, **graded decay** fades cold memories while pinning preferences, every record **stamps the model that wrote it**, and swapping embedders is caught and healed. Ten feature-gate docs, a research-mapping section, and honest failure findings — all in the README."
 
 ---
 
