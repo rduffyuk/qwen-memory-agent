@@ -45,11 +45,19 @@ that's the **exact-match** path, and the model even preserves detail (`e.g. Over
 `type=preference` (durable, salience pinned). One demo, both retirement paths: exact *and* semantic.
 
 ## [1:00–1:30] Beat 2 — budget-constrained recall · Technical Depth
+Stay in the browser. The two boxes beside the message input are `session_id` (leave `demo`)
+and **`token_budget`** (defaults `1024`). Point at the budget box, **change it from `1024` to `32`**,
+then send *"What do I drink?"* — the reply still answers **tea**, and the `… tok` chip on the
+message shows recall stayed tiny under the tight cap. Set the box back to `1024` afterwards so the
+later beats behave normally.
+> "See the second box — that's a hard token budget on recalled memory. I'll crank it down from 1024 to 32. Retrieval scores every memory by cosine + recency + salience + a type prior, then greedily packs to that cap — Qdrant-backed vector search, not an in-process shortcut. Still answers tea, but the context it pulled stays tiny. Relevant memory stays small even as the store grows."
+
+*(Terminal fallback if you'd rather not touch the UI:*
 ```bash
 curl -sS -X POST "$BASE/chat" -H 'content-type: application/json' \
   -d '{"message":"What do I drink?","session_id":"demo","token_budget":32}' | jq
 ```
-> "Retrieval scores every memory by cosine + recency + salience + a type prior, then greedily packs to a hard token budget — Qdrant-backed vector search, not an in-process shortcut. Relevant context stays small even as memory grows."
+*)*
 
 ## [1:30–2:00] Beat 3 — token observability · engineering rigor
 ```bash
