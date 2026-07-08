@@ -2,9 +2,11 @@
 
 **Track:** Track 1 — MemoryAgent
 **Repo:** https://github.com/rduffyuk/qwen-memory-agent (public, MIT)
-**Deadline (hard):** **Thu 9 Jul 2026, 2:00 PM PDT** = **22:00 BST (UK)** = 21:00 UTC
-— per the Devpost rules-page Submission Period (May 26 08:00 PT – Jul 9 14:00 PT).
-Target self-submit by end of **8 Jul** to leave the 9th as buffer for YouTube transcode.
+**Deadline (hard):** **Mon 20 Jul 2026, 2:00 PM PDT** = **22:00 BST (UK)** = 21:00 UTC
+— per the Devpost rules-page Submission Period (May 26 08:00 PT – Jul 20 14:00 PT).
+Judging Period: Jul 28 – Aug 11 2026; winners on/around Aug 2026.
+Target self-submit by **19 Jul** to leave the 20th as buffer for YouTube transcode.
+(Deadline extended +11 days from the original 9 Jul — verified against the live Devpost rules page 9 Jul 2026.)
 
 ---
 
