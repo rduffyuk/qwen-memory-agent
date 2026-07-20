@@ -4,6 +4,8 @@ A **benchmarked, MCP-native persistent-memory agent** built on **Qwen Cloud** (A
 
 The agent *itself* decides — via Qwen function-calling — when to remember, recall, or forget. It carries user preferences across sessions, **forgets superseded facts**, and recalls the right memories inside a **tight token budget** — and proves it with numbers against naive baselines.
 
+**[▶ Watch the 3-minute demo](https://youtu.be/TOMjFJ4ayYg)** · [Devpost submission](https://devpost.com/software/qwen-memory-agent) · [Build write-up](https://rduffy.uk/writing/memory-as-a-measurable-engineering-problem/)
+
 ## Why it's different
 
 Most memory agents are "stuff everything into RAG and hope." This one treats memory as a
